@@ -22,6 +22,23 @@ const initDb = () => {
         assigned_campaigns TEXT,
         assigned_countries TEXT,
         status TEXT DEFAULT 'Active',
+        two_factor_secret TEXT,
+        two_factor_enabled BOOLEAN DEFAULT 0,
+        whitelisted_ips TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Audit Logs
+    db.run(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        agency_id TEXT,
+        user_email TEXT,
+        action TEXT,
+        resource TEXT,
+        ip_address TEXT,
+        status TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);

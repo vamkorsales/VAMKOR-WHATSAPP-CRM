@@ -12,8 +12,10 @@ function Login() {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    twoFactorToken: ''
   });
+  const [requires2FA, setRequires2FA] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -25,6 +27,10 @@ function Login() {
 
     try {
       const response = await axios.post(`${API_URL}/api/auth/login`, formData);
+      if (response.status === 206 || response.data.requires2FA) {
+        setRequires2FA(true);
+        return;
+      }
       login(response.data.token, response.data.user);
       navigate('/dashboard');
     } catch (err) {
@@ -52,27 +58,30 @@ function Login() {
 
         <form onSubmit={handleSubmit}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <TextField 
-              required 
-              fullWidth 
-              label="Email Address" 
-              name="email" 
-              type="email" 
-              value={formData.email} 
-              onChange={handleChange} 
-            />
-            <TextField 
-              required 
-              fullWidth 
-              label="Password" 
-              name="password" 
-              type="password" 
-              value={formData.password} 
-              onChange={handleChange} 
-            />
+            {!requires2FA ? (
+              <>
+                <TextField 
+                  required fullWidth label="Email Address" name="email" type="email" 
+                  value={formData.email} onChange={handleChange} 
+                />
+                <TextField 
+                  required fullWidth label="Password" name="password" type="password" 
+                  value={formData.password} onChange={handleChange} 
+                />
+              </>
+            ) : (
+              <>
+                <Typography color="primary" sx={{ mb: 1, fontWeight: 'bold' }}>Two-Factor Authentication</Typography>
+                <TextField 
+                  required fullWidth label="6-Digit Authenticator Code" name="twoFactorToken" 
+                  value={formData.twoFactorToken} onChange={handleChange} 
+                  inputProps={{ maxLength: 6 }}
+                />
+              </>
+            )}
             
             <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 2, py: 1.5 }}>
-              Log In
+              {requires2FA ? 'Verify 2FA & Log In' : 'Log In'}
             </Button>
             
             <Typography textAlign="center" color="text.secondary">

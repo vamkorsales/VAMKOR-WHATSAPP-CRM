@@ -16,6 +16,24 @@ import Billing from './pages/Billing';
 import Team from './pages/Team';
 import SuperAdmin from './pages/SuperAdmin';
 import { AuthGuard } from './AuthGuard';
+import { useAuth } from './AuthContext';
+import { Navigate } from 'react-router-dom';
+
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
+    return <Navigate to="/dashboard/overview" replace />;
+  }
+  return children;
+};
+
+const SuperAdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  if (user?.role !== 'SUPER_ADMIN') {
+    return <Navigate to="/dashboard/overview" replace />;
+  }
+  return children;
+};
 
 function App() {
   return (
@@ -31,11 +49,11 @@ function App() {
         <Route path="contacts" element={<Contacts />} />
         <Route path="templates" element={<Templates />} />
         <Route path="campaigns" element={<Campaigns />} />
-        <Route path="integration" element={<Integration />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="billing" element={<Billing />} />
-        <Route path="team" element={<Team />} />
-        <Route path="super-admin" element={<SuperAdmin />} />
+        <Route path="integration" element={<AdminRoute><Integration /></AdminRoute>} />
+        <Route path="settings" element={<AdminRoute><Settings /></AdminRoute>} />
+        <Route path="billing" element={<AdminRoute><Billing /></AdminRoute>} />
+        <Route path="team" element={<AdminRoute><Team /></AdminRoute>} />
+        <Route path="super-admin" element={<SuperAdminRoute><SuperAdmin /></SuperAdminRoute>} />
       </Route>
     </Routes>
   );

@@ -2,12 +2,40 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 const { db, initDb } = require('./database');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.set('trust proxy', 1);
+
+// Global API Rate Limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000,
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
+});
+app.use('/api/', apiLimiter);
+
+// Strict Login Limiter
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many login attempts, please try again later' }
+});
+
+// Audit Logging Middleware
+const logAudit = (agency_id, user_email, action, resource, ip_address, status) => {
+  const id = Date.now().toString();
+  db.run("INSERT INTO audit_logs (id, agency_id, user_email, action, resource, ip_address, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [id, agency_id || 'System', user_email || 'Unknown', action, resource, ip_address, status],
+    (err) => { if (err) console.error("Audit log error:", err.message); }
+  );
+};
 
 // Initialize SQLite Database
 initDb();
@@ -104,18 +132,51 @@ app.get('/api/auth/agents', checkJwt, (req, res) => {
   });
 });
 
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
+app.post('/api/auth/login', loginLimiter, (req, res) => {
+  const { email, password, twoFactorToken } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!user) {
+      logAudit(null, email, 'LOGIN', 'Authentication', req.ip, 'FAILED_USER_NOT_FOUND');
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
     const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!match) {
+      logAudit(user.agency_id, email, 'LOGIN', 'Authentication', req.ip, 'FAILED_PASSWORD');
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // IP Whitelist Check (Admin only)
+    if (user.role === 'ADMIN' && user.whitelisted_ips) {
+      const allowedIps = JSON.parse(user.whitelisted_ips);
+      if (allowedIps.length > 0 && !allowedIps.includes(req.ip)) {
+        logAudit(user.agency_id, email, 'LOGIN', 'Authentication', req.ip, 'FAILED_IP_NOT_WHITELISTED');
+        return res.status(403).json({ error: 'Access from this IP is restricted' });
+      }
+    }
+
+    // 2FA Check
+    if (user.two_factor_enabled) {
+      if (!twoFactorToken) {
+        return res.status(206).json({ requires2FA: true, message: 'Please provide 2FA token' });
+      }
+      const verified = speakeasy.totp.verify({
+        secret: user.two_factor_secret,
+        encoding: 'base32',
+        token: twoFactorToken
+      });
+      if (!verified) {
+        logAudit(user.agency_id, email, 'LOGIN', 'Authentication', req.ip, 'FAILED_2FA');
+        return res.status(401).json({ error: 'Invalid 2FA token' });
+      }
+    }
+
+    logAudit(user.agency_id, email, 'LOGIN', 'Authentication', req.ip, 'SUCCESS');
 
     const token = jwt.sign({ 
       id: user.id, 
@@ -125,6 +186,43 @@ app.post('/api/auth/login', (req, res) => {
       agency_id: user.agency_id 
     }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ token, user: { id: user.id, email: user.email, username: user.username, companyName: user.company_name, role: user.role, agency_id: user.agency_id } });
+  });
+});
+
+// Setup 2FA
+app.post('/api/auth/2fa/setup', checkJwt, (req, res) => {
+  const secret = speakeasy.generateSecret({ name: `VamkorCRM (${req.user.email})` });
+  QRCode.toDataURL(secret.otpauth_url, (err, data_url) => {
+    if (err) return res.status(500).json({ error: 'Failed to generate QR Code' });
+    
+    db.run("UPDATE users SET two_factor_secret = ? WHERE id = ?", [secret.base32, req.user.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user.agency_id, req.user.email, 'SETUP_2FA', 'Security', req.ip, 'SUCCESS');
+      res.json({ secret: secret.base32, qrCode: data_url });
+    });
+  });
+});
+
+app.post('/api/auth/2fa/verify', checkJwt, (req, res) => {
+  const { token } = req.body;
+  db.get("SELECT two_factor_secret FROM users WHERE id = ?", [req.user.id], (err, user) => {
+    if (err || !user) return res.status(500).json({ error: 'Failed to retrieve secret' });
+    
+    const verified = speakeasy.totp.verify({
+      secret: user.two_factor_secret,
+      encoding: 'base32',
+      token
+    });
+
+    if (verified) {
+      db.run("UPDATE users SET two_factor_enabled = 1 WHERE id = ?", [req.user.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        logAudit(req.user.agency_id, req.user.email, 'ENABLE_2FA', 'Security', req.ip, 'SUCCESS');
+        res.json({ success: true });
+      });
+    } else {
+      res.status(400).json({ error: 'Invalid verification code' });
+    }
   });
 });
 
