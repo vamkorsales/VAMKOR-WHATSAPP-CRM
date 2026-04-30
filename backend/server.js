@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { auth } = require('express-oauth2-jwt-bearer');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { db, initDb } = require('./database');
 require('dotenv').config();
 
@@ -11,18 +12,78 @@ app.use(express.json());
 // Initialize SQLite Database
 initDb();
 
-// Authorization middleware. When used, the Access Token must
-// exist and be verified against the Auth0 JSON Web Key Set.
-const checkJwt = auth({
-  audience: process.env.AUTH0_AUDIENCE || 'https://api.vamkor.com',
-  issuerBaseURL: process.env.AUTH0_ISSUER_BASE_URL || 'https://dev-vamkor.us.auth0.com/',
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
+
+// Custom JWT Middleware
+const checkJwt = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid authorization header' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// ==========================================
+// AUTH ROUTES
+// ==========================================
+
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password, contactNumber, username, companyName, country } = req.body;
+  if (!email || !password || !username) {
+    return res.status(400).json({ error: 'Email, password, and username are required' });
+  }
+
+  try {
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+    db.run(
+      `INSERT INTO users (id, email, password_hash, contact_number, username, company_name, country) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, email, passwordHash, contactNumber, username, companyName, country],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE')) {
+            return res.status(409).json({ error: 'Email or username already exists' });
+          }
+          return res.status(500).json({ error: err.message });
+        }
+        
+        const token = jwt.sign({ id, email, username }, JWT_SECRET, { expiresIn: '24h' });
+        res.status(201).json({ token, user: { id, email, username, companyName } });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-// Mock Auth0 setup instructions if env variables are missing
-if (!process.env.AUTH0_ISSUER_BASE_URL) {
-  console.warn("⚠️ AUTH0_ISSUER_BASE_URL is not set in .env.");
-  console.warn("⚠️ The API is currently running WITH auth, but it will fail unless configured.");
-}
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) return res.status(401).json({ error: 'Invalid email or password' });
+
+    const token = jwt.sign({ id: user.id, email: user.email, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ token, user: { id: user.id, email: user.email, username: user.username, companyName: user.company_name } });
+  });
+});
 
 // ==========================================
 // API ROUTES
@@ -165,4 +226,4 @@ app.post('/api/whatsapp/webhook', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Backend Server running on port ${PORT} with SQLite & Auth0 JWT Protection`));
+app.listen(PORT, () => console.log(`Backend Server running on port ${PORT} with custom JWT Protection`));

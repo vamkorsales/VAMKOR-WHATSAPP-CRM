@@ -1,6 +1,8 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Homepage from './pages/Homepage';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 import DashboardLayout from './pages/DashboardLayout';
 import Chat from './pages/Chat';
 import Contacts from './pages/Contacts';
@@ -16,6 +18,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Homepage />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
       <Route path="/dashboard" element={<AuthGuard component={DashboardLayout} />}>
         {/* Default route for /dashboard redirects or defaults to overview */}
         <Route index element={<Overview />} />

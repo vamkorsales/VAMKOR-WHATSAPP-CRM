@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import { Auth0Provider } from '@auth0/auth0-react';
+import { AuthProvider } from './AuthContext';
 import App from './App';
 
 const glassTheme = createTheme({
@@ -79,20 +79,13 @@ const glassTheme = createTheme({
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <Auth0Provider
-      domain={process.env.REACT_APP_AUTH0_DOMAIN || "dev-vamkor.us.auth0.com"}
-      clientId={process.env.REACT_APP_AUTH0_CLIENT_ID || "mock-client-id"}
-      authorizationParams={{
-        redirect_uri: window.location.origin,
-        audience: process.env.REACT_APP_AUTH0_AUDIENCE || "https://api.vamkor.com"
-      }}
-    >
+    <AuthProvider>
       <ThemeProvider theme={glassTheme}>
         <CssBaseline />
         <BrowserRouter>
           <App />
         </BrowserRouter>
       </ThemeProvider>
-    </Auth0Provider>
+    </AuthProvider>
   </React.StrictMode>
 );
