@@ -7,6 +7,20 @@ const db = new sqlite3.Database(dbPath);
 
 const initDb = () => {
   db.serialize(() => {
+    // Users Table (Custom Auth)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE,
+        password_hash TEXT,
+        contact_number TEXT,
+        username TEXT UNIQUE,
+        company_name TEXT,
+        country TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Customers Table
     db.run(`
       CREATE TABLE IF NOT EXISTS customers (
