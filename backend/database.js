@@ -7,7 +7,7 @@ const db = new sqlite3.Database(dbPath);
 
 const initDb = () => {
   db.serialize(() => {
-    // Users Table (Custom Auth)
+    // Users Table (Custom Auth & RBAC)
     db.run(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -17,6 +17,8 @@ const initDb = () => {
         username TEXT UNIQUE,
         company_name TEXT,
         country TEXT,
+        role TEXT DEFAULT 'ADMIN', 
+        agency_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -25,6 +27,7 @@ const initDb = () => {
     db.run(`
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY,
+        agency_id TEXT,
         name TEXT,
         phone TEXT,
         email TEXT,
@@ -41,6 +44,7 @@ const initDb = () => {
     db.run(`
       CREATE TABLE IF NOT EXISTS messages (
         id TEXT PRIMARY KEY,
+        agency_id TEXT,
         customer_id TEXT,
         message TEXT,
         direction TEXT,
@@ -53,6 +57,7 @@ const initDb = () => {
     db.run(`
       CREATE TABLE IF NOT EXISTS templates (
         id TEXT PRIMARY KEY,
+        agency_id TEXT,
         name TEXT,
         content TEXT,
         category TEXT,
@@ -61,11 +66,45 @@ const initDb = () => {
       )
     `);
 
-    // Integration Settings (Key-Value pairs essentially)
+    // Campaigns Table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS campaigns (
+        id TEXT PRIMARY KEY,
+        agency_id TEXT,
+        name TEXT,
+        status TEXT DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Subscriptions Table (Billing)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        agency_id TEXT PRIMARY KEY,
+        plan TEXT DEFAULT 'Free',
+        status TEXT DEFAULT 'active',
+        next_billing_date DATETIME
+      )
+    `);
+
+    // Payment History Table (Billing)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        agency_id TEXT,
+        amount REAL,
+        status TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Integration Settings
     db.run(`
       CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
+        agency_id TEXT,
+        key TEXT,
+        value TEXT,
+        PRIMARY KEY (agency_id, key)
       )
     `);
     

@@ -66,7 +66,7 @@ function Signup() {
       justifyContent: 'center',
       p: 2
     }}>
-      <Paper elevation={0} sx={{ p: { xs: 4, md: 6 }, maxWidth: 800, width: '100%' }}>
+      <Paper elevation={1} sx={{ p: { xs: 4, md: 6 }, maxWidth: 800, width: '100%' }}>
         <Typography variant="h4" fontWeight="bold" textAlign="center" gutterBottom color="primary">
           Vamkor CRM
         </Typography>

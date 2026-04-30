@@ -5,43 +5,27 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { AuthProvider } from './AuthContext';
 import App from './App';
 
-const glassTheme = createTheme({
+const lightTheme = createTheme({
   palette: {
-    mode: 'dark',
+    mode: 'light',
     primary: {
       main: '#10B981', // Emerald/WhatsApp Green
       contrastText: '#fff',
     },
     background: {
-      default: '#0B1120', // Dark background
-      paper: 'rgba(30, 41, 59, 0.4)', // Translucent dark
+      default: '#F3F4F6', // Light gray background
+      paper: '#FFFFFF',
     },
     text: {
-      primary: '#f8fafc',
-      secondary: '#94a3b8',
+      primary: '#111827',
+      secondary: '#4b5563',
     },
-    divider: 'rgba(255, 255, 255, 0.08)',
+    divider: '#e5e7eb',
   },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
   },
   components: {
-    MuiCssBaseline: {
-      styleOverrides: `
-        body {
-          background-image: radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
-                            radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
-          background-attachment: fixed;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .MuiPaper-root, .MuiCard-root {
-          animation: fadeIn 0.4s ease-out forwards;
-        }
-      `,
-    },
     MuiButton: {
       styleOverrides: {
         root: {
@@ -54,22 +38,16 @@ const glassTheme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          borderRadius: '16px',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
         },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: '16px',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: 'rgba(30, 41, 59, 0.4)',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
         },
       },
     },
@@ -80,7 +58,7 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <AuthProvider>
-      <ThemeProvider theme={glassTheme}>
+      <ThemeProvider theme={lightTheme}>
         <CssBaseline />
         <BrowserRouter>
           <App />
