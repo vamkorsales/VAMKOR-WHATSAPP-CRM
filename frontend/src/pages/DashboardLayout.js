@@ -11,6 +11,9 @@ import SettingsInputComponent from '@mui/icons-material/SettingsInputComponent';
 import Settings from '@mui/icons-material/Settings';
 import ExitToApp from '@mui/icons-material/ExitToApp';
 import MenuIcon from '@mui/icons-material/Menu';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Campaign from '@mui/icons-material/Campaign';
+import BarChart from '@mui/icons-material/BarChart';
 
 const drawerWidth = 280;
 
@@ -24,9 +27,12 @@ function DashboardLayout() {
   };
 
   const navItems = [
+    { path: '/dashboard/overview', icon: <Dashboard />, label: 'Overview' },
     { path: '/dashboard/chat', icon: <Message />, label: 'Conversations' },
     { path: '/dashboard/contacts', icon: <People />, label: 'Contacts' },
     { path: '/dashboard/templates', icon: <Description />, label: 'Templates' },
+    { path: '/dashboard/campaigns', icon: <Campaign />, label: 'Campaigns' },
+    { path: '/dashboard/analytics', icon: <BarChart />, label: 'Analytics' },
     { path: '/dashboard/integration', icon: <SettingsInputComponent />, label: 'Integration' },
     { path: '/dashboard/settings', icon: <Settings />, label: 'Settings' },
   ];
