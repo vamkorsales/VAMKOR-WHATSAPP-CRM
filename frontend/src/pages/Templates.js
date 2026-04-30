@@ -4,7 +4,9 @@ import {
   Box, Typography, Button, Paper, Grid, Card, CardContent, Chip, 
   TextField, MenuItem, Select, FormControl, InputLabel
 } from '@mui/material';
-import { Add, CheckCircleOutline, AccessTime } from '@mui/icons-material';
+import Add from '@mui/icons-material/Add';
+import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline';
+import AccessTime from '@mui/icons-material/AccessTime';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 

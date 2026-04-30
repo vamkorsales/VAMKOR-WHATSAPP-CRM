@@ -1,7 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, Typography, Container, Grid, Paper } from '@mui/material';
-import { ArrowForward, ChatBubbleOutline, PeopleOutline, Bolt } from '@mui/icons-material';
+import ArrowForward from '@mui/icons-material/ArrowForward';
+import ChatBubbleOutline from '@mui/icons-material/ChatBubbleOutline';
+import PeopleOutline from '@mui/icons-material/PeopleOutline';
+import Bolt from '@mui/icons-material/Bolt';
 
 function Homepage() {
   const navigate = useNavigate();

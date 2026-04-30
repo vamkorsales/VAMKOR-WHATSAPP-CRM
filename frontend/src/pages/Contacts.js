@@ -4,7 +4,9 @@ import {
   Box, Paper, Typography, Button, TextField, InputAdornment, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow 
 } from '@mui/material';
-import { Upload, Download, Search } from '@mui/icons-material';
+import Upload from '@mui/icons-material/Upload';
+import Download from '@mui/icons-material/Download';
+import Search from '@mui/icons-material/Search';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 

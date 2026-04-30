@@ -4,7 +4,8 @@ import {
   Box, Paper, Typography, List, ListItem, ListItemButton, ListItemAvatar, 
   Avatar, ListItemText, TextField, IconButton, Divider
 } from '@mui/material';
-import { Send, Chat as ChatIcon } from '@mui/icons-material';
+import Send from '@mui/icons-material/Send';
+import ChatIcon from '@mui/icons-material/Chat';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 

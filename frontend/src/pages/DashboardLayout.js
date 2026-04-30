@@ -4,9 +4,13 @@ import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
   Typography, AppBar, Toolbar, Divider, IconButton
 } from '@mui/material';
-import { 
-  Message, People, Description, SettingsInputComponent, Settings, ExitToApp, Menu as MenuIcon
-} from '@mui/icons-material';
+import Message from '@mui/icons-material/Message';
+import People from '@mui/icons-material/People';
+import Description from '@mui/icons-material/Description';
+import SettingsInputComponent from '@mui/icons-material/SettingsInputComponent';
+import Settings from '@mui/icons-material/Settings';
+import ExitToApp from '@mui/icons-material/ExitToApp';
+import MenuIcon from '@mui/icons-material/Menu';
 
 const drawerWidth = 280;
 
