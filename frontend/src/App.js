@@ -16,7 +16,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Homepage />} />
-      <Route path="/dashboard" element={<DashboardLayout />}>
+      <Route path="/dashboard" element={<AuthGuard component={DashboardLayout} />}>
         {/* Default route for /dashboard redirects or defaults to overview */}
         <Route index element={<Overview />} />
         <Route path="overview" element={<Overview />} />
