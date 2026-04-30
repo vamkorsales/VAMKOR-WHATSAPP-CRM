@@ -5,7 +5,7 @@ import {
   TextField, MenuItem, Select, FormControl, InputLabel
 } from '@mui/material';
 import Add from '@mui/icons-material/Add';
-import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline';
+import CheckCircle from '@mui/icons-material/CheckCircle';
 import AccessTime from '@mui/icons-material/AccessTime';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
@@ -108,7 +108,7 @@ function Templates() {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Typography variant="h6" fontWeight="bold">{template.name}</Typography>
                   <Chip 
-                    icon={template.status === 'APPROVED' ? <CheckCircleOutline fontSize="small" /> : <AccessTime fontSize="small" />}
+                    icon={template.status === 'APPROVED' ? <CheckCircle fontSize="small" /> : <AccessTime fontSize="small" />}
                     label={template.status} 
                     color={template.status === 'APPROVED' ? 'success' : 'warning'}
                     size="small"

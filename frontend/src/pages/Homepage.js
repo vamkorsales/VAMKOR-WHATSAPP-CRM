@@ -2,8 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, Typography, Container, Grid, Paper } from '@mui/material';
 import ArrowForward from '@mui/icons-material/ArrowForward';
-import ChatBubbleOutline from '@mui/icons-material/ChatBubbleOutline';
-import PeopleOutline from '@mui/icons-material/PeopleOutline';
+import ChatBubble from '@mui/icons-material/ChatBubble';
+import People from '@mui/icons-material/People';
 import Bolt from '@mui/icons-material/Bolt';
 
 function Homepage() {
@@ -14,7 +14,7 @@ function Homepage() {
       {/* Navigation */}
       <Box sx={{ py: 3, px: { xs: 2, md: 6 }, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ChatBubbleOutline color="primary" fontSize="large" />
+          <ChatBubble color="primary" fontSize="large" />
           <Typography variant="h5" fontWeight="bold" color="text.primary">
             Vamkor
           </Typography>
@@ -84,7 +84,7 @@ function Homepage() {
             <Grid item xs={12} md={4}>
               <Paper elevation={0} sx={{ p: 4, height: '100%', border: '1px solid', borderColor: 'divider' }}>
                 <Box sx={{ p: 2, display: 'inline-flex', borderRadius: 2, bgcolor: 'primary.light', color: 'primary.contrastText', mb: 3 }}>
-                  <ChatBubbleOutline />
+                  <ChatBubble />
                 </Box>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>Smart Conversations</Typography>
                 <Typography color="text.secondary">Manage all your WhatsApp chats in one unified, collaborative inbox.</Typography>
@@ -102,7 +102,7 @@ function Homepage() {
             <Grid item xs={12} md={4}>
               <Paper elevation={0} sx={{ p: 4, height: '100%', border: '1px solid', borderColor: 'divider' }}>
                 <Box sx={{ p: 2, display: 'inline-flex', borderRadius: 2, bgcolor: 'secondary.light', color: 'secondary.contrastText', mb: 3 }}>
-                  <PeopleOutline />
+                  <People />
                 </Box>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>Contact Management</Typography>
                 <Typography color="text.secondary">Import thousands of contacts via CSV and organize them with tags.</Typography>
