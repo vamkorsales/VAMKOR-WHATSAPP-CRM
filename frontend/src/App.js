@@ -12,6 +12,9 @@ import Analytics from './pages/Analytics';
 import Integration from './pages/Integration';
 import Settings from './pages/Settings';
 import Overview from './pages/Overview';
+import Billing from './pages/Billing';
+import Team from './pages/Team';
+import SuperAdmin from './pages/SuperAdmin';
 import { AuthGuard } from './AuthGuard';
 
 function App() {
@@ -31,6 +34,9 @@ function App() {
         <Route path="analytics" element={<Analytics />} />
         <Route path="integration" element={<Integration />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="billing" element={<Billing />} />
+        <Route path="team" element={<Team />} />
+        <Route path="super-admin" element={<SuperAdmin />} />
       </Route>
     </Routes>
   );

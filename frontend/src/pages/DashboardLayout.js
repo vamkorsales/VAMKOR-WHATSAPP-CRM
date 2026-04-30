@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import { 
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
   Typography, AppBar, Toolbar, Divider, IconButton
@@ -13,29 +13,54 @@ import ExitToApp from '@mui/icons-material/ExitToApp';
 import MenuIcon from '@mui/icons-material/Menu';
 import Dashboard from '@mui/icons-material/Dashboard';
 import Campaign from '@mui/icons-material/Campaign';
-import BarChart from '@mui/icons-material/BarChart';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import GroupsIcon from '@mui/icons-material/Groups';
+import PaymentIcon from '@mui/icons-material/Payment';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { useAuth } from '../AuthContext';
 
-const drawerWidth = 280;
+const drawerWidth = 260;
 
 function DashboardLayout() {
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const navItems = [
-    { path: '/dashboard/overview', icon: <Dashboard />, label: 'Overview' },
-    { path: '/dashboard/chat', icon: <Message />, label: 'Conversations' },
-    { path: '/dashboard/contacts', icon: <People />, label: 'Contacts' },
-    { path: '/dashboard/templates', icon: <Description />, label: 'Templates' },
-    { path: '/dashboard/campaigns', icon: <Campaign />, label: 'Campaigns' },
-    { path: '/dashboard/analytics', icon: <BarChart />, label: 'Analytics' },
-    { path: '/dashboard/integration', icon: <SettingsInputComponent />, label: 'Integration' },
-    { path: '/dashboard/settings', icon: <Settings />, label: 'Settings' },
+  // Base items for agents
+  let menuItems = [
+    { text: 'Overview', icon: <Dashboard />, path: '/dashboard/overview' },
+    { text: 'Conversations', icon: <Message />, path: '/dashboard/chat' },
+    { text: 'Contacts', icon: <People />, path: '/dashboard/contacts' },
+    { text: 'Templates', icon: <Description />, path: '/dashboard/templates' },
+    { text: 'Campaigns', icon: <Campaign />, path: '/dashboard/campaigns' },
   ];
+
+  // Admin gets extra tools
+  if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
+    menuItems.push(
+      { text: 'Analytics', icon: <AnalyticsIcon />, path: '/dashboard/analytics' },
+      { text: 'Integration', icon: <SettingsInputComponent />, path: '/dashboard/integration' },
+      { text: 'Team', icon: <GroupsIcon />, path: '/dashboard/team' },
+      { text: 'Billing', icon: <PaymentIcon />, path: '/dashboard/billing' },
+      { text: 'Settings', icon: <Settings />, path: '/dashboard/settings' }
+    );
+  }
+
+  // Super Admin gets a dedicated view
+  if (user?.role === 'SUPER_ADMIN') {
+    menuItems.unshift({ text: 'Super Admin', icon: <AdminPanelSettingsIcon />, path: '/dashboard/super-admin' });
+  }
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -47,31 +72,31 @@ function DashboardLayout() {
       </Box>
       
       <List sx={{ px: 2, flex: 1 }}>
-        {navItems.map((item) => {
-          const isActive = location.pathname.includes(item.path);
-          return (
-            <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
-              <ListItemButton 
-                component={NavLink} 
-                to={item.path}
-                onClick={() => setMobileOpen(false)}
-                sx={{ 
-                  borderRadius: 2,
-                  bgcolor: isActive ? 'primary.light' : 'transparent',
-                  color: isActive ? 'primary.contrastText' : 'text.secondary',
-                  '&:hover': {
-                    bgcolor: isActive ? 'primary.light' : 'action.hover',
-                  }
-                }}
-              >
-                <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: isActive ? 600 : 500 }} />
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
+        {menuItems.map((item) => (
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              component={Link}
+              to={item.path}
+              selected={location.pathname === item.path}
+              onClick={() => setMobileOpen(false)}
+              sx={{
+                borderRadius: '8px',
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(16, 185, 129, 0.1)',
+                  color: '#10B981',
+                  '& .MuiListItemIcon-root': {
+                    color: '#10B981',
+                  },
+                },
+              }}
+            >
+              <ListItemIcon sx={{ color: location.pathname === item.path ? '#10B981' : 'inherit', minWidth: 40 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: 500 }} />
+            </ListItemButton>
+          </ListItem>
+        ))}
       </List>
       
       <Divider />
@@ -115,7 +140,7 @@ function DashboardLayout() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            {navItems.find(i => location.pathname.includes(i.path))?.label || 'Dashboard'}
+            {menuItems.find(i => location.pathname.includes(i.path))?.text || 'Dashboard'}
           </Typography>
         </Toolbar>
       </AppBar>
@@ -160,7 +185,7 @@ function DashboardLayout() {
         }}
       >
         <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ display: { xs: 'none', sm: 'block' }, mb: 4 }}>
-          {navItems.find(i => location.pathname.includes(i.path))?.label || 'Dashboard'}
+          {menuItems.find(i => location.pathname.includes(i.path))?.text || 'Dashboard'}
         </Typography>
         <Box sx={{ flex: 1, overflow: 'auto' }}>
           <Outlet />
