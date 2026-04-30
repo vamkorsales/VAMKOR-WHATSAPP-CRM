@@ -69,18 +69,18 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Admin creating an Agent
 app.post('/api/auth/agents', checkJwt, async (req, res) => {
-  if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Only admins can create agents' });
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Only admins can create agents' });
 
-  const { email, password, username, contactNumber } = req.body;
+  const { email, password, username, contactNumber, role, assigned_campaigns, assigned_countries, status } = req.body;
   try {
     const passwordHash = await bcrypt.hash(password, 10);
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const agency_id = req.user.agency_id;
 
     db.run(
-      `INSERT INTO users (id, email, password_hash, contact_number, username, role, agency_id) 
-       VALUES (?, ?, ?, ?, ?, 'AGENT', ?)`,
-      [id, email, passwordHash, contactNumber, username, agency_id],
+      `INSERT INTO users (id, email, password_hash, contact_number, username, role, assigned_campaigns, assigned_countries, status, agency_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, email, passwordHash, contactNumber, username, role || 'AGENT', JSON.stringify(assigned_campaigns || []), JSON.stringify(assigned_countries || []), status || 'Active', agency_id],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.status(201).json({ success: true, message: 'Agent created successfully' });
@@ -93,10 +93,14 @@ app.post('/api/auth/agents', checkJwt, async (req, res) => {
 
 // Get all agents for an agency
 app.get('/api/auth/agents', checkJwt, (req, res) => {
-  if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Unauthorized' });
-  db.all("SELECT id, email, username, contact_number, created_at FROM users WHERE agency_id = ? AND role = 'AGENT'", [req.user.agency_id], (err, rows) => {
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Unauthorized' });
+  db.all("SELECT id, email, username, contact_number, role, assigned_campaigns, assigned_countries, status, created_at FROM users WHERE agency_id = ? AND role != 'ADMIN' AND role != 'SUPER_ADMIN'", [req.user.agency_id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    res.json(rows.map(r => ({
+      ...r,
+      assigned_campaigns: JSON.parse(r.assigned_campaigns || '[]'),
+      assigned_countries: JSON.parse(r.assigned_countries || '[]')
+    })));
   });
 });
 

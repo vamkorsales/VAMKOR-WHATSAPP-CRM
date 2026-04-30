@@ -17,8 +17,22 @@ const initDb = () => {
         username TEXT UNIQUE,
         company_name TEXT,
         country TEXT,
-        role TEXT DEFAULT 'ADMIN', 
+        role TEXT DEFAULT 'Admin', 
         agency_id TEXT,
+        assigned_campaigns TEXT,
+        assigned_countries TEXT,
+        status TEXT DEFAULT 'Active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Roles and Permissions Matrix
+    db.run(`
+      CREATE TABLE IF NOT EXISTS roles_permissions (
+        id TEXT PRIMARY KEY,
+        agency_id TEXT,
+        role_name TEXT,
+        permissions TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -72,7 +86,20 @@ const initDb = () => {
         id TEXT PRIMARY KEY,
         agency_id TEXT,
         name TEXT,
-        status TEXT DEFAULT 'active',
+        type TEXT,
+        status TEXT DEFAULT 'Active',
+        budget_used REAL DEFAULT 0,
+        messages_limit INTEGER DEFAULT 0,
+        sent INTEGER DEFAULT 0,
+        delivered INTEGER DEFAULT 0,
+        opened INTEGER DEFAULT 0,
+        replied INTEGER DEFAULT 0,
+        failed INTEGER DEFAULT 0,
+        data_added INTEGER DEFAULT 0,
+        assigned_agent TEXT,
+        open_time TEXT,
+        language TEXT,
+        approval_status TEXT DEFAULT 'Pending',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
