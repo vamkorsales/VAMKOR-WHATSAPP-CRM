@@ -17,6 +17,7 @@ import AnalyticsIcon from '@mui/icons-material/Analytics';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PaymentIcon from '@mui/icons-material/Payment';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import BusinessIcon from '@mui/icons-material/Business';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../AuthContext';
 
@@ -27,6 +28,7 @@ function DashboardLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [activeClient, setActiveClient] = React.useState('Vamkor HQ');
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -138,9 +140,24 @@ function DashboardLayout() {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {menuItems.find(i => location.pathname.includes(i.path))?.text || 'Dashboard'}
           </Typography>
+
+          {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f1f5f9', px: 2, py: 0.5, borderRadius: 2 }}>
+              <BusinessIcon fontSize="small" color="action" />
+              <select 
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' }}
+                value={activeClient}
+                onChange={(e) => setActiveClient(e.target.value)}
+              >
+                <option value="Vamkor HQ">Vamkor HQ</option>
+                <option value="Client A (Nike)">Client A (Nike)</option>
+                <option value="Client B (Adidas)">Client B (Adidas)</option>
+              </select>
+            </Box>
+          )}
         </Toolbar>
       </AppBar>
 

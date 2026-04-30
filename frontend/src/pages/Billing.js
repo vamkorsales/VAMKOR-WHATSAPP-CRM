@@ -1,112 +1,138 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, Grid, Card, CardContent, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip } from '@mui/material';
-import axios from 'axios';
-import { useAuth } from '../AuthContext';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+import React, { useState } from 'react';
+import { 
+  Box, Typography, Paper, Grid, Button, Switch, Divider, Table, TableBody, TableCell, 
+  TableContainer, TableHead, TableRow, Chip, TextField, MenuItem, FormControlLabel, Card, CardContent
+} from '@mui/material';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 function Billing() {
-  const { token, user } = useAuth();
-  const [billingData, setBillingData] = useState({ subscription: {}, history: [] });
+  const [billingCycle, setBillingCycle] = useState('Monthly');
+  const [autoRenew, setAutoRenew] = useState(true);
+  const [walletBalance] = useState(450.00);
 
-  useEffect(() => {
-    fetchBillingData();
-  }, []);
-
-  const fetchBillingData = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/billing`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setBillingData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch billing data", error);
-    }
-  };
-
-  const handleUpgrade = async (plan) => {
-    try {
-      await axios.post(`${API_URL}/api/billing/upgrade`, { plan }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchBillingData();
-      alert(`Successfully upgraded to ${plan} plan!`);
-    } catch (error) {
-      alert("Upgrade failed.");
-    }
-  };
+  const invoices = [
+    { id: 'INV-2026-001', client: 'Vamkor HQ', plan: 'Enterprise Hybrid', amount: 1200, gst: 216, total: 1416, status: 'Paid', date: '2026-04-01' },
+    { id: 'INV-2026-002', client: 'Vamkor HQ', plan: 'Usage Overage', amount: 150, gst: 27, total: 177, status: 'Pending', date: '2026-04-15' },
+  ];
 
   return (
-    <Box>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>Billing & Subscriptions</Typography>
-      <Typography color="text.secondary" mb={4}>Manage your payment methods and subscription plans.</Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Typography variant="h4" fontWeight="bold">Advanced Billing & Subscriptions</Typography>
 
-      <Grid container spacing={3} mb={5}>
+      {/* Credit Wallet & Usage Overview */}
+      <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%', border: billingData.subscription.plan === 'Free' ? '2px solid #10B981' : 'none' }}>
+          <Card elevation={1} sx={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white' }}>
             <CardContent>
-              <Typography variant="h6">Free Tier</Typography>
-              <Typography variant="h3" fontWeight="bold" my={2}>$0<Typography component="span" color="text.secondary">/mo</Typography></Typography>
-              <Typography color="text.secondary" mb={3}>Basic WhatsApp outreach for starters.</Typography>
-              <Button fullWidth variant={billingData.subscription.plan === 'Free' ? 'outlined' : 'contained'} onClick={() => handleUpgrade('Free')} disabled={billingData.subscription.plan === 'Free'}>
-                {billingData.subscription.plan === 'Free' ? 'Current Plan' : 'Downgrade'}
-              </Button>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ opacity: 0.9 }}>Credit Wallet</Typography>
+                <AccountBalanceWalletIcon color="success" />
+              </Box>
+              <Typography variant="h3" fontWeight="bold" gutterBottom>${walletBalance.toFixed(2)}</Typography>
+              <Button variant="contained" color="success" size="small" fullWidth>➕ Add Funds</Button>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%', border: billingData.subscription.plan === 'Pro' ? '2px solid #10B981' : 'none' }}>
-            <CardContent>
-              <Typography variant="h6">Pro Plan</Typography>
-              <Typography variant="h3" fontWeight="bold" my={2}>$49<Typography component="span" color="text.secondary">/mo</Typography></Typography>
-              <Typography color="text.secondary" mb={3}>Advanced analytics and team management.</Typography>
-              <Button fullWidth variant={billingData.subscription.plan === 'Pro' ? 'outlined' : 'contained'} color="primary" onClick={() => handleUpgrade('Pro')} disabled={billingData.subscription.plan === 'Pro'}>
-                {billingData.subscription.plan === 'Pro' ? 'Current Plan' : 'Upgrade to Pro'}
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%', border: billingData.subscription.plan === 'Enterprise' ? '2px solid #10B981' : 'none' }}>
-            <CardContent>
-              <Typography variant="h6">Enterprise</Typography>
-              <Typography variant="h3" fontWeight="bold" my={2}>$199<Typography component="span" color="text.secondary">/mo</Typography></Typography>
-              <Typography color="text.secondary" mb={3}>Unlimited agents and dedicated support.</Typography>
-              <Button fullWidth variant={billingData.subscription.plan === 'Enterprise' ? 'outlined' : 'contained'} color="primary" onClick={() => handleUpgrade('Enterprise')} disabled={billingData.subscription.plan === 'Enterprise'}>
-                {billingData.subscription.plan === 'Enterprise' ? 'Current Plan' : 'Upgrade to Enterprise'}
-              </Button>
-            </CardContent>
-          </Card>
+        
+        <Grid item xs={12} md={8}>
+          <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>Usage-Based Metrics (April 2026)</Typography>
+            <Grid container spacing={4} sx={{ mt: 1 }}>
+              <Grid item xs={4}>
+                <Typography color="text.secondary">Utility Convos</Typography>
+                <Typography variant="h5" fontWeight="bold">12,450</Typography>
+                <Typography variant="caption" color="text.secondary">$0.005 / msg</Typography>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography color="text.secondary">Marketing Convos</Typography>
+                <Typography variant="h5" fontWeight="bold">45,100</Typography>
+                <Typography variant="caption" color="text.secondary">$0.015 / msg</Typography>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography color="text.secondary">Current Overage</Typography>
+                <Typography variant="h5" fontWeight="bold" color="error">-$125.50</Typography>
+                <Typography variant="caption" color="text.secondary">Will be billed EOM</Typography>
+              </Grid>
+            </Grid>
+          </Paper>
         </Grid>
       </Grid>
 
-      <Typography variant="h5" fontWeight="bold" gutterBottom>Payment History</Typography>
-      <Paper elevation={1}>
+      {/* Subscription Management */}
+      <Paper elevation={1} sx={{ p: 3 }}>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>Subscription Management</Typography>
+        <Divider sx={{ mb: 3 }} />
+        
+        <Grid container spacing={4}>
+          <Grid item xs={12} sm={6}>
+            <TextField select label="Billing Model" value="Hybrid" fullWidth margin="normal">
+              <MenuItem value="Subscription">Subscription Only</MenuItem>
+              <MenuItem value="Pay-per-message">Pay-per-message (PAYG)</MenuItem>
+              <MenuItem value="Hybrid">Hybrid (Subscription + Usage)</MenuItem>
+            </TextField>
+            <TextField select label="Billing Cycle" value={billingCycle} onChange={(e) => setBillingCycle(e.target.value)} fullWidth margin="normal">
+              <MenuItem value="Monthly">Monthly</MenuItem>
+              <MenuItem value="Yearly">Yearly (Save 20%)</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Box sx={{ bgcolor: '#F8FAFC', p: 2, borderRadius: 2, height: '100%' }}>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Payment Settings</Typography>
+              <FormControlLabel 
+                control={<Switch checked={autoRenew} onChange={(e) => setAutoRenew(e.target.checked)} color="primary" />} 
+                label={<Typography fontWeight="bold">Auto-renewal enabled</Typography>} 
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 4, mb: 2 }}>
+                Automatically charge the primary card on file when the billing cycle ends or wallet drops below $50.
+              </Typography>
+              
+              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                <TextField label="Coupon / Discount Code" size="small" />
+                <Button variant="outlined">Apply</Button>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Invoices */}
+      <Paper elevation={1} sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant="h6" fontWeight="bold">Invoices & Statements</Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" size="small" color="primary">Pay via Stripe</Button>
+            <Button variant="outlined" size="small" color="secondary">Pay via Razorpay</Button>
+          </Box>
+        </Box>
         <TableContainer>
-          <Table>
-            <TableHead>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#F8FAFC' }}>
               <TableRow>
-                <TableCell>Invoice ID</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Amount</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Invoice ID</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Client Name</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Plan / Item</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Amount</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>GST (18%)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Total</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {billingData.history.length === 0 ? (
-                <TableRow><TableCell colSpan={4} align="center">No payment history found.</TableCell></TableRow>
-              ) : (
-                billingData.history.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.id}</TableCell>
-                    <TableCell>{new Date(row.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>${row.amount.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Chip label={row.status} color={row.status === 'succeeded' ? 'success' : 'warning'} size="small" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              {invoices.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{inv.id}</TableCell>
+                  <TableCell>{inv.client}</TableCell>
+                  <TableCell>{inv.plan}</TableCell>
+                  <TableCell>${inv.amount.toFixed(2)}</TableCell>
+                  <TableCell>${inv.gst.toFixed(2)}</TableCell>
+                  <TableCell fontWeight="bold">${inv.total.toFixed(2)}</TableCell>
+                  <TableCell>{inv.date}</TableCell>
+                  <TableCell>
+                    <Chip label={inv.status} color={inv.status === 'Paid' ? 'success' : 'warning'} size="small" />
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </TableContainer>
