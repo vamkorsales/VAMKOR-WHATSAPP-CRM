@@ -31,7 +31,6 @@ function App() {
         <Route path="contacts" element={<Contacts />} />
         <Route path="templates" element={<Templates />} />
         <Route path="campaigns" element={<Campaigns />} />
-        <Route path="analytics" element={<Analytics />} />
         <Route path="integration" element={<Integration />} />
         <Route path="settings" element={<Settings />} />
         <Route path="billing" element={<Billing />} />

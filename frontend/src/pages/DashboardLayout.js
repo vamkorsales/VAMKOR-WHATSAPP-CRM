@@ -44,7 +44,6 @@ function DashboardLayout() {
   // Admin gets extra tools
   if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
     menuItems.push(
-      { text: 'Analytics', icon: <AnalyticsIcon />, path: '/dashboard/analytics' },
       { text: 'Integration', icon: <SettingsInputComponent />, path: '/dashboard/integration' },
       { text: 'Team', icon: <GroupsIcon />, path: '/dashboard/team' },
       { text: 'Billing', icon: <PaymentIcon />, path: '/dashboard/billing' },

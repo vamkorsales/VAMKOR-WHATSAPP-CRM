@@ -91,9 +91,15 @@ function Team() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" fontWeight="bold">Team Management</Typography>
-        <Button variant="contained" onClick={() => setOpen(true)} size="large">➕ Add User</Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button variant="outlined" component="label" size="large">
+            Upload CSV/Excel
+            <input type="file" hidden accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
+          </Button>
+          <Button variant="contained" onClick={() => setOpen(true)} size="large">➕ Add User</Button>
+        </Box>
       </Box>
 
       <Paper elevation={1}>
