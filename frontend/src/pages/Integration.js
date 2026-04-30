@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ShieldCheck, AlertTriangle } from 'lucide-react';
-import './DashboardPages.css';
+import { 
+  Box, Typography, Button, Paper, TextField, Alert, AlertTitle
+} from '@mui/material';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
@@ -48,75 +49,71 @@ function Integration() {
   };
 
   return (
-    <div className="page-container" style={{ maxWidth: '800px' }}>
+    <Box sx={{ maxWidth: 800, display: 'flex', flexDirection: 'column', gap: 4 }}>
       
       {integration && integration.webhookVerified ? (
-        <div className="alert success-alert glass-panel">
-          <ShieldCheck size={24} />
-          <div>
-            <h4>WhatsApp API Connected</h4>
-            <p>Your WhatsApp Business account is successfully integrated and webhook is verified.</p>
-          </div>
-        </div>
+        <Alert severity="success" sx={{ border: '1px solid', borderColor: 'success.light' }}>
+          <AlertTitle>WhatsApp API Connected</AlertTitle>
+          Your WhatsApp Business account is successfully integrated and webhook is verified.
+        </Alert>
       ) : (
-        <div className="alert warning-alert glass-panel">
-          <AlertTriangle size={24} />
-          <div>
-            <h4>Integration Pending</h4>
-            <p>Please configure your Meta App credentials to start sending and receiving messages.</p>
-          </div>
-        </div>
+        <Alert severity="warning" sx={{ border: '1px solid', borderColor: 'warning.light' }}>
+          <AlertTitle>Integration Pending</AlertTitle>
+          Please configure your Meta App credentials to start sending and receiving messages.
+        </Alert>
       )}
 
-      <form className="glass-panel settings-form" onSubmit={handleSave}>
-        <h3>Meta API Credentials</h3>
-        <p className="text-muted" style={{marginBottom: '24px'}}>Enter the details from your Meta Developer Portal.</p>
+      <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>Meta API Credentials</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+          Enter the details from your Meta Developer Portal.
+        </Typography>
         
-        <div className="form-group">
-          <label>Phone Number ID</label>
-          <input 
-            type="text" 
+        <Box component="form" onSubmit={handleSave} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <TextField 
+            label="Phone Number ID" 
+            variant="outlined" 
             required
+            fullWidth
             value={formData.phoneNumberId}
             onChange={(e) => setFormData({...formData, phoneNumberId: e.target.value})}
             placeholder="e.g. 1045938294829"
           />
-        </div>
-        
-        <div className="form-group">
-          <label>WhatsApp Business Account ID</label>
-          <input 
-            type="text" 
+          
+          <TextField 
+            label="WhatsApp Business Account ID" 
+            variant="outlined" 
             required
+            fullWidth
             value={formData.whatsappBusinessAccountId}
             onChange={(e) => setFormData({...formData, whatsappBusinessAccountId: e.target.value})}
             placeholder="e.g. 102938475620"
           />
-        </div>
-        
-        <div className="form-group">
-          <label>Temporary or Permanent Access Token</label>
-          <input 
-            type="password" 
+          
+          <TextField 
+            label="Temporary or Permanent Access Token" 
+            variant="outlined" 
+            type="password"
             required
+            fullWidth
             value={formData.accessToken}
             onChange={(e) => setFormData({...formData, accessToken: e.target.value})}
             placeholder="EAA..."
           />
-        </div>
 
-        <div className="form-group">
-          <label>Webhook URL (Configure this in Meta)</label>
-          <div className="readonly-input">
-            {API_URL}/api/whatsapp/webhook
-          </div>
-        </div>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>Webhook URL (Configure this in Meta)</Typography>
+            <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1, border: '1px dashed', borderColor: 'divider', fontFamily: 'monospace', color: 'text.secondary' }}>
+              {API_URL}/api/whatsapp/webhook
+            </Box>
+          </Box>
 
-        <button type="submit" className="btn-primary" disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save Configuration'}
-        </button>
-      </form>
-    </div>
+          <Button type="submit" variant="contained" disabled={isSaving} sx={{ alignSelf: 'flex-start', mt: 2 }}>
+            {isSaving ? 'Saving...' : 'Save Configuration'}
+          </Button>
+        </Box>
+      </Paper>
+    </Box>
   );
 }
 

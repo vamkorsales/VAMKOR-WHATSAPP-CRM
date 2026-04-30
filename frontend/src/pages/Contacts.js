@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Upload, Download, Search } from 'lucide-react';
-import './DashboardPages.css';
+import { 
+  Box, Paper, Typography, Button, TextField, InputAdornment, 
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow 
+} from '@mui/material';
+import { Upload, Download, Search } from '@mui/icons-material';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
@@ -26,7 +29,6 @@ function Contacts() {
   const handleMockImport = async () => {
     setIsImporting(true);
     try {
-      // Mock CSV data import
       const mockNewContacts = [
         { name: 'Alice Johnson', phone: '+1122334455', email: 'alice@example.com' },
         { name: 'Bob Williams', phone: '+9988776655', email: 'bob@example.com' }
@@ -46,55 +48,73 @@ function Contacts() {
   );
 
   return (
-    <div className="page-container">
-      <div className="page-actions">
-        <div className="search-box">
-          <Search size={18} />
-          <input 
-            type="text" 
-            placeholder="Search contacts..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="action-buttons">
-          <button className="btn-secondary">
-            <Download size={18} /> Export CSV
-          </button>
-          <button className="btn-primary" onClick={handleMockImport} disabled={isImporting}>
-            <Upload size={18} /> {isImporting ? 'Importing...' : 'Import CSV'}
-          </button>
-        </div>
-      </div>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      
+      {/* Actions Row */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <TextField
+          placeholder="Search contacts..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search fontSize="small" />
+              </InputAdornment>
+            ),
+            sx: { bgcolor: 'background.paper', borderRadius: 2, width: { xs: '100%', sm: 300 } }
+          }}
+        />
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button variant="outlined" startIcon={<Download />} color="inherit" sx={{ bgcolor: 'background.paper' }}>
+            Export CSV
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<Upload />} 
+            onClick={handleMockImport} 
+            disabled={isImporting}
+          >
+            {isImporting ? 'Importing...' : 'Import CSV'}
+          </Button>
+        </Box>
+      </Box>
 
-      <div className="data-table-container glass-panel">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Phone Number</th>
-              <th>Email</th>
-              <th>Date Added</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredContacts.map(contact => (
-              <tr key={contact.id}>
-                <td className="font-medium">{contact.name}</td>
-                <td>{contact.phone}</td>
-                <td className="text-muted">{contact.email || '-'}</td>
-                <td className="text-muted">{new Date(contact.created_at).toLocaleDateString()}</td>
-              </tr>
+      {/* Data Table */}
+      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+        <Table sx={{ minWidth: 650 }}>
+          <TableHead sx={{ bgcolor: 'background.default' }}>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>NAME</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>PHONE NUMBER</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>EMAIL</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>DATE ADDED</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredContacts.map((contact) => (
+              <TableRow key={contact.id} sx={{ '&:last-child td, &:last-child th': { border: 0 }, '&:hover': { bgcolor: 'action.hover' } }}>
+                <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                  {contact.name}
+                </TableCell>
+                <TableCell>{contact.phone}</TableCell>
+                <TableCell sx={{ color: 'text.secondary' }}>{contact.email || '-'}</TableCell>
+                <TableCell sx={{ color: 'text.secondary' }}>{new Date(contact.created_at).toLocaleDateString()}</TableCell>
+              </TableRow>
             ))}
             {filteredContacts.length === 0 && (
-              <tr>
-                <td colSpan="4" className="text-center py-8 text-muted">No contacts found</td>
-              </tr>
+              <TableRow>
+                <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                  No contacts found.
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+    </Box>
   );
 }
 

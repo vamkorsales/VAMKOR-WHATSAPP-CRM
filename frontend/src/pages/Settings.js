@@ -1,55 +1,60 @@
 import React from 'react';
-import { User, Bell, Shield } from 'lucide-react';
-import './DashboardPages.css';
+import { 
+  Box, Typography, Paper, TextField, Button, Switch, FormControlLabel, Divider
+} from '@mui/material';
 
 function Settings() {
   return (
-    <div className="page-container" style={{ maxWidth: '800px' }}>
+    <Box sx={{ maxWidth: 800, display: 'flex', flexDirection: 'column', gap: 4 }}>
       
-      <div className="settings-section glass-panel">
-        <div className="settings-header">
-          <User className="settings-icon" />
-          <div>
-            <h3>Profile Settings</h3>
-            <p className="text-muted">Manage your account details and preferences.</p>
-          </div>
-        </div>
-        <div className="settings-content">
-          <div className="form-group">
-            <label>Full Name</label>
-            <input type="text" defaultValue="Pratiksha Nandedkar" />
-          </div>
-          <div className="form-group">
-            <label>Email Address</label>
-            <input type="email" defaultValue="pratiksha@vamkor.com" />
-          </div>
-          <button className="btn-primary">Save Changes</button>
-        </div>
-      </div>
+      <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>Profile Settings</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+          Manage your account details and preferences.
+        </Typography>
+        
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <TextField 
+            label="Full Name" 
+            variant="outlined" 
+            fullWidth
+            defaultValue="Pratiksha Nandedkar"
+          />
+          <TextField 
+            label="Email Address" 
+            variant="outlined" 
+            fullWidth
+            type="email"
+            defaultValue="pratiksha@vamkor.com"
+          />
+          <Button variant="contained" sx={{ alignSelf: 'flex-start', mt: 2 }}>
+            Save Changes
+          </Button>
+        </Box>
+      </Paper>
 
-      <div className="settings-section glass-panel">
-        <div className="settings-header">
-          <Bell className="settings-icon" />
-          <div>
-            <h3>Notifications</h3>
-            <p className="text-muted">Configure how you receive alerts.</p>
-          </div>
-        </div>
-        <div className="settings-content">
-          <div className="toggle-group">
-            <label className="toggle-label">
-              <span>Email Notifications</span>
-              <input type="checkbox" defaultChecked />
-            </label>
-            <label className="toggle-label">
-              <span>Desktop Notifications for New Messages</span>
-              <input type="checkbox" defaultChecked />
-            </label>
-          </div>
-        </div>
-      </div>
+      <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>Notifications</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+          Configure how you receive alerts.
+        </Typography>
+        
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <FormControlLabel 
+            control={<Switch defaultChecked color="primary" />} 
+            label="Email Notifications" 
+            sx={{ m: 0, justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+          />
+          <Divider />
+          <FormControlLabel 
+            control={<Switch defaultChecked color="primary" />} 
+            label="Desktop Notifications for New Messages" 
+            sx={{ m: 0, justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+          />
+        </Box>
+      </Paper>
 
-    </div>
+    </Box>
   );
 }
 

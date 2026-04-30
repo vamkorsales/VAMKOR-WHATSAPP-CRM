@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Send, MessageSquare } from 'lucide-react';
-import './Chat.css';
+import { 
+  Box, Paper, Typography, List, ListItem, ListItemButton, ListItemAvatar, 
+  Avatar, ListItemText, TextField, IconButton, Divider
+} from '@mui/material';
+import { Send, Chat as ChatIcon } from '@mui/icons-material';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
@@ -71,72 +74,111 @@ function Chat() {
   };
 
   return (
-    <div className="chat-container">
-      <aside className="customers glass-panel">
-        <h2>Conversations</h2>
-        <ul>
+    <Box sx={{ display: 'flex', height: '100%', gap: 3, overflow: 'hidden' }}>
+      
+      {/* Conversations List */}
+      <Paper elevation={0} sx={{ width: 350, display: 'flex', flexDirection: 'column', border: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="h6" fontWeight="bold">Conversations</Typography>
+        </Box>
+        <List sx={{ flex: 1, overflow: 'auto', p: 0 }}>
           {customers.map(customer => (
-            <li 
-              key={customer.id} 
-              onClick={() => selectCustomer(customer)}
-              className={selectedCustomer?.id === customer.id ? 'active' : ''}
-            >
-              <div className="customer-name">{customer.name}</div>
-              <div className="customer-phone">{customer.phone}</div>
-            </li>
+            <React.Fragment key={customer.id}>
+              <ListItem disablePadding>
+                <ListItemButton 
+                  selected={selectedCustomer?.id === customer.id}
+                  onClick={() => selectCustomer(customer)}
+                  sx={{ p: 2 }}
+                >
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: 'primary.main' }}>{customer.name.charAt(0)}</Avatar>
+                  </ListItemAvatar>
+                  <ListItemText 
+                    primary={customer.name} 
+                    secondary={customer.phone}
+                    primaryTypographyProps={{ fontWeight: selectedCustomer?.id === customer.id ? 'bold' : 'normal' }}
+                  />
+                </ListItemButton>
+              </ListItem>
+              <Divider />
+            </React.Fragment>
           ))}
           {customers.length === 0 && (
-            <li style={{textAlign: 'center', opacity: 0.5, pointerEvents: 'none'}}>
+            <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
               No conversations found
-            </li>
+            </Box>
           )}
-        </ul>
-      </aside>
-      
-      <main className="chat-main glass-panel">
+        </List>
+      </Paper>
+
+      {/* Main Chat Area */}
+      <Paper elevation={0} sx={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid', borderColor: 'divider' }}>
         {selectedCustomer ? (
           <>
-            <div className="chat-header">
-              <div className="avatar">
-                {selectedCustomer.name.charAt(0)}
-              </div>
-              <div>
-                <h2>{selectedCustomer.name}</h2>
-                <div className="subtitle">{selectedCustomer.phone}</div>
-              </div>
-            </div>
-            
-            <div className="messages">
-              {messages.map(msg => (
-                <div key={msg.id} className={`message-wrapper ${msg.direction}`}>
-                  <div className="message-bubble">
-                    {msg.message}
-                  </div>
-                </div>
-              ))}
+            {/* Chat Header */}
+            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>{selectedCustomer.name.charAt(0)}</Avatar>
+              <Box>
+                <Typography variant="subtitle1" fontWeight="bold">{selectedCustomer.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{selectedCustomer.phone}</Typography>
+              </Box>
+            </Box>
+
+            {/* Messages Area */}
+            <Box sx={{ flex: 1, overflow: 'auto', p: 3, display: 'flex', flexDirection: 'column', gap: 2, bgcolor: '#F9FAFB' }}>
+              {messages.map(msg => {
+                const isOut = msg.direction === 'out';
+                return (
+                  <Box key={msg.id} sx={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
+                    <Box 
+                      sx={{ 
+                        maxWidth: '70%', 
+                        p: 2, 
+                        borderRadius: 2,
+                        bgcolor: isOut ? 'primary.main' : 'background.paper',
+                        color: isOut ? 'primary.contrastText' : 'text.primary',
+                        boxShadow: 1,
+                        borderBottomRightRadius: isOut ? 0 : 8,
+                        borderBottomLeftRadius: !isOut ? 0 : 8,
+                      }}
+                    >
+                      <Typography variant="body1">{msg.message}</Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
               <div ref={messagesEndRef} />
-            </div>
-            
-            <form className="input-area" onSubmit={sendMessage}>
-              <input
-                type="text"
+            </Box>
+
+            {/* Input Area */}
+            <Box component="form" onSubmit={sendMessage} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, bgcolor: 'background.paper' }}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="Type a message..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
+                size="small"
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 8 } }}
               />
-              <button type="submit" disabled={!newMessage.trim()}>
-                <Send size={20} />
-              </button>
-            </form>
+              <IconButton 
+                type="submit" 
+                color="primary" 
+                disabled={!newMessage.trim()}
+                sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}
+              >
+                <Send />
+              </IconButton>
+            </Box>
           </>
         ) : (
-          <div className="empty-state">
-            <MessageSquare size={64} opacity={0.5} />
-            <p>Select a conversation to start messaging</p>
-          </div>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
+            <ChatIcon sx={{ fontSize: 64, opacity: 0.2, mb: 2 }} />
+            <Typography variant="h6">Select a conversation to start messaging</Typography>
+          </Box>
         )}
-      </main>
-    </div>
+      </Paper>
+    </Box>
   );
 }
 
