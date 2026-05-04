@@ -29,27 +29,47 @@ const checkJwt = async (req, res, next) => {
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
-      return res.status(401).json({ error: 'Invalid token' });
+      console.error('[checkJwt] Token validation failed:', error?.message);
+      return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
     }
-    
-    // Fetch profile to get agency_id and role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('agency_id, role')
-      .eq('id', user.id)
-      .single();
 
-    req.user = { 
-      id: user.id, 
-      email: user.email, 
-      agency_id: profile?.agency_id || user.id, // Fallback if no profile
-      role: profile?.role || 'ADMIN' 
-    };
+    // Try to fetch profile — but NEVER fail if it doesn't exist yet
+    let agency_id = user.id;  // default: user's own ID is their agency
+    let role = 'ADMIN';
+    try {
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('agency_id, role')
+        .eq('id', user.id)
+        .single();
+
+      if (profile && !profileErr) {
+        agency_id = profile.agency_id || user.id;
+        role = profile.role || 'ADMIN';
+      }
+    } catch (profileFetchErr) {
+      // Profile table may not exist or row missing — that's OK, use user.id as agency
+      console.warn('[checkJwt] Could not load profile, using user.id as agency_id');
+    }
+
+    req.user = { id: user.id, email: user.email, agency_id, role };
     next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Internal auth error' });
+  } catch (err) {
+    console.error('[checkJwt] Unexpected error:', err.message);
+    return res.status(401).json({ error: 'Auth error: ' + err.message });
   }
 };
+
+// ── Debug endpoint (remove in production) ──
+app.get('/api/debug', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('customers').select('count').limit(1);
+    if (error) return res.json({ ok: false, supabase_error: error.message });
+    res.json({ ok: true, message: 'Supabase connection works', time: new Date().toISOString() });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
 
 // ==========================================
 // API ROUTES (Supabase Integrated)
@@ -57,14 +77,19 @@ const checkJwt = async (req, res, next) => {
 
 // --- Customers (Leads) ---
 app.get('/api/customers', checkJwt, async (req, res) => {
+  console.log('[GET /api/customers] agency_id =', req.user.agency_id);
   const { data, error } = await supabase
     .from('customers')
     .select('*')
     .eq('agency_id', req.user.agency_id)
     .order('created_at', { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  if (error) {
+    console.error('[GET /api/customers] Supabase error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+  console.log('[GET /api/customers] Returned', data?.length || 0, 'records');
+  res.json(data || []);
 });
 
 app.post('/api/customers', checkJwt, async (req, res) => {
@@ -86,24 +111,34 @@ app.post('/api/customers', checkJwt, async (req, res) => {
 // Import multiple customers
 app.post('/api/contacts/import', checkJwt, async (req, res) => {
   const { contacts } = req.body;
-  if (!Array.isArray(contacts)) return res.status(400).json({ error: 'Invalid data format' });
+  if (!Array.isArray(contacts) || contacts.length === 0) {
+    return res.status(400).json({ error: 'contacts must be a non-empty array' });
+  }
 
   const mappedContacts = contacts.map(c => ({
     agency_id: req.user.agency_id,
-    name: c.name,
-    phone: c.phone,
-    email: c.email,
-    country_code: c.countryCode,
-    dial_code: c.dialCode,
-    source: c.source,
-    tag: c.tag,
-    campaign: c.campaign
-  }));
+    name: (c.name || '').toString().trim(),
+    phone: (c.phone || '').toString().trim(),
+    email: (c.email || '').toString().trim() || null,
+    country_code: c.countryCode || 'US',
+    dial_code: c.dialCode || '+1',
+    source: c.source || 'CSV Import',
+    tag: c.tag || 'Cold',
+    campaign: c.campaign || null
+  })).filter(c => c.name && c.phone); // safety: skip rows with no name or phone
 
-  const { data, error } = await supabase.from('customers').insert(mappedContacts);
-  
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, count: mappedContacts.length });
+  if (mappedContacts.length === 0) {
+    return res.status(400).json({ error: 'No valid contacts found in the import data.' });
+  }
+
+  console.log('[POST /api/contacts/import] Importing', mappedContacts.length, 'contacts for agency', req.user.agency_id);
+  const { data, error } = await supabase.from('customers').insert(mappedContacts).select();
+
+  if (error) {
+    console.error('[POST /api/contacts/import] Error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ success: true, count: data.length });
 });
 
 // --- Messages ---
