@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import { 
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
-  Typography, AppBar, Toolbar, Divider, IconButton
+  Typography, AppBar, Toolbar, Divider, IconButton, Avatar, Menu, MenuItem
 } from '@mui/material';
 import Message from '@mui/icons-material/Message';
 import People from '@mui/icons-material/People';
@@ -29,6 +29,15 @@ function DashboardLayout() {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [activeClient, setActiveClient] = React.useState('Vamkor HQ');
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const openMenu = Boolean(anchorEl);
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -103,11 +112,11 @@ function DashboardLayout() {
       <Divider />
       <List sx={{ px: 2, pb: 2, pt: 2 }}>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => navigate('/')} sx={{ borderRadius: 2, color: 'text.secondary' }}>
+          <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2, color: 'error.main' }}>
             <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
-              <ExitToApp />
+              <LogoutIcon />
             </ListItemIcon>
-            <ListItemText primary="Exit Dashboard" />
+            <ListItemText primary="Log Out" />
           </ListItemButton>
         </ListItem>
       </List>
@@ -200,9 +209,49 @@ function DashboardLayout() {
           mt: { xs: 8, sm: 0 }
         }}
       >
-        <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ display: { xs: 'none', sm: 'block' }, mb: 4 }}>
-          {menuItems.find(i => location.pathname.includes(i.path))?.text || 'Dashboard'}
-        </Typography>
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Typography variant="h4" fontWeight="bold" sx={{ mb: 0 }}>
+            {menuItems.find(i => location.pathname.includes(i.path))?.text || 'Dashboard'}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ textAlign: 'right', mr: 1 }}>
+              <Typography variant="subtitle2" fontWeight="bold">
+                {user?.user_metadata?.username || user?.user_metadata?.name || user?.email || 'User'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                {user?.role?.toLowerCase().replace('_', ' ') || 'Agent'}
+              </Typography>
+            </Box>
+            <IconButton onClick={handleClick} size="small" sx={{ p: 0 }}>
+              <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 'bold' }}>
+                {(user?.user_metadata?.username || user?.email || 'U').charAt(0).toUpperCase()}
+              </Avatar>
+            </IconButton>
+            <Menu
+              anchorEl={anchorEl}
+              open={openMenu}
+              onClose={handleClose}
+              onClick={handleClose}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              sx={{ mt: 1 }}
+            >
+              <MenuItem onClick={() => navigate('/dashboard/settings')}>
+                <ListItemIcon><Settings fontSize="small" /></ListItemIcon>
+                Profile Details
+              </MenuItem>
+              <MenuItem onClick={() => navigate('/dashboard/settings')}>
+                <ListItemIcon><Settings fontSize="small" /></ListItemIcon>
+                Settings
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+                <ListItemIcon sx={{ color: 'error.main' }}><LogoutIcon fontSize="small" /></ListItemIcon>
+                Log Out
+              </MenuItem>
+            </Menu>
+          </Box>
+        </Box>
         <Box sx={{ flex: 1, overflow: 'auto' }}>
           <Outlet />
         </Box>

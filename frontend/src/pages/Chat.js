@@ -2,23 +2,29 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
   Box, Paper, Typography, List, ListItem, ListItemButton, ListItemAvatar, 
-  Avatar, ListItemText, TextField, IconButton, Divider
+  Avatar, ListItemText, TextField, IconButton, Divider, CircularProgress
 } from '@mui/material';
 import Send from '@mui/icons-material/Send';
 import ChatIcon from '@mui/icons-material/Chat';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import { supabase } from '../supabaseClient';
+import { useAuth } from '../AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 function Chat() {
+  const { token } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    if (token) fetchCustomers();
+  }, [token]);
 
   useEffect(() => {
     scrollToBottom();
@@ -30,7 +36,7 @@ function Chat() {
 
   const fetchCustomers = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/customers`);
+      const res = await axios.get(`${API_URL}/api/customers`, { headers: { Authorization: `Bearer ${token}` } });
       setCustomers(res.data);
     } catch (err) {
       console.error('Failed to fetch customers:', err);
@@ -39,7 +45,7 @@ function Chat() {
 
   const fetchMessages = async (customerId) => {
     try {
-      const res = await axios.get(`${API_URL}/api/messages/${customerId}`);
+      const res = await axios.get(`${API_URL}/api/messages/${customerId}`, { headers: { Authorization: `Bearer ${token}` } });
       setMessages(res.data);
     } catch (err) {
       console.error('Failed to fetch messages:', err);
@@ -49,6 +55,53 @@ function Chat() {
   const selectCustomer = (customer) => {
     setSelectedCustomer(customer);
     fetchMessages(customer.id);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedCustomer) return;
+
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    try {
+      // 1. Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('chat_attachments')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat_attachments')
+        .getPublicUrl(filePath);
+
+      // 3. Send Message via Backend
+      const mediaType = file.type.startsWith('image/') ? 'image' : 
+                        file.type.startsWith('video/') ? 'video' : 'document';
+      
+      const mockId = Date.now().toString();
+      setMessages(prev => [...prev, { id: mockId, message: `[Media attached: ${file.name}]`, direction: 'out', media_url: publicUrl }]);
+
+      await axios.post(`${API_URL}/api/messages`, {
+        customerId: selectedCustomer.id,
+        message: `[Media] ${file.name}`,
+        direction: 'OUTBOUND',
+        mediaUrl: publicUrl,
+        mediaType: mediaType
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      
+      fetchMessages(selectedCustomer.id);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload attachment.');
+    } finally {
+      setUploading(false);
+      e.target.value = ''; // reset input
+    }
   };
 
   const sendMessage = async (e) => {
@@ -65,8 +118,9 @@ function Chat() {
       await axios.post(`${API_URL}/api/messages`, {
         customerId: selectedCustomer.id,
         message: tempMessage,
-        direction: 'out'
-      });
+        direction: 'OUTBOUND'
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      
       fetchMessages(selectedCustomer.id);
     } catch (err) {
       console.error('Failed to send message:', err);
@@ -92,7 +146,7 @@ function Chat() {
                   sx={{ p: 2 }}
                 >
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'primary.main' }}>{customer.name.charAt(0)}</Avatar>
+                    <Avatar sx={{ bgcolor: 'primary.main' }}>{customer.name?.charAt(0) || '?'}</Avatar>
                   </ListItemAvatar>
                   <ListItemText 
                     primary={customer.name} 
@@ -118,7 +172,7 @@ function Chat() {
           <>
             {/* Chat Header */}
             <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>{selectedCustomer.name.charAt(0)}</Avatar>
+              <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>{selectedCustomer.name?.charAt(0) || '?'}</Avatar>
               <Box>
                 <Typography variant="subtitle1" fontWeight="bold">{selectedCustomer.name}</Typography>
                 <Typography variant="body2" color="text.secondary">{selectedCustomer.phone}</Typography>
@@ -128,7 +182,7 @@ function Chat() {
             {/* Messages Area */}
             <Box sx={{ flex: 1, overflow: 'auto', p: 3, display: 'flex', flexDirection: 'column', gap: 2, bgcolor: '#F9FAFB' }}>
               {messages.map(msg => {
-                const isOut = msg.direction === 'out';
+                const isOut = msg.direction === 'OUTBOUND' || msg.direction === 'out';
                 return (
                   <Box key={msg.id} sx={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
                     <Box 
@@ -143,6 +197,15 @@ function Chat() {
                         borderBottomLeftRadius: !isOut ? 0 : 8,
                       }}
                     >
+                      {msg.media_url ? (
+                        <Box sx={{ mb: 1 }}>
+                          {msg.media_url.match(/\.(jpeg|jpg|gif|png)$/) ? (
+                            <img src={msg.media_url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 4 }} />
+                          ) : (
+                            <a href={msg.media_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>View Attachment</a>
+                          )}
+                        </Box>
+                      ) : null}
                       <Typography variant="body1">{msg.message}</Typography>
                     </Box>
                   </Box>
@@ -152,7 +215,21 @@ function Chat() {
             </Box>
 
             {/* Input Area */}
-            <Box component="form" onSubmit={sendMessage} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, bgcolor: 'background.paper' }}>
+            <Box component="form" onSubmit={sendMessage} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, bgcolor: 'background.paper', alignItems: 'center' }}>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                onChange={handleFileUpload} 
+              />
+              <IconButton 
+                color="secondary" 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? <CircularProgress size={24} /> : <AttachFileIcon />}
+              </IconButton>
+              
               <TextField
                 fullWidth
                 variant="outlined"

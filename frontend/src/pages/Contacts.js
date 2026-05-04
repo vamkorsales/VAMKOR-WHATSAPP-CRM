@@ -10,6 +10,7 @@ import CloudUpload from '@mui/icons-material/CloudUpload';
 import CloudDownload from '@mui/icons-material/CloudDownload';
 import MoreVert from '@mui/icons-material/MoreVert';
 import ReactCountryFlag from 'react-country-flag';
+import { useAuth } from '../AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
@@ -21,9 +22,11 @@ const countryOptions = [
 ];
 
 function Contacts() {
+  const { token } = useAuth();
   const [contacts, setContacts] = useState([]);
   const [search, setSearch] = useState('');
   const [openAdd, setOpenAdd] = useState(false);
+  const fileInputRef = React.useRef(null);
   const [formData, setFormData] = useState({
     name: '', phone: '', email: '', countryCode: 'IN', dialCode: '+91', source: '', tag: 'Cold', campaign: ''
   });
@@ -33,20 +36,34 @@ function Contacts() {
 
   const fetchContacts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/contacts`);
-      setContacts(response.data);
+      const response = await axios.get(`${API_URL}/api/customers`, { headers: { Authorization: `Bearer ${token}` } });
+      
+      // Ensure we have an array to map over
+      let data = response.data;
+      if (!Array.isArray(data)) {
+        if (data.error) throw new Error(data.error);
+        data = [];
+      }
+      
+      const mappedContacts = data.map(c => ({
+        ...c,
+        countryCode: c.country_code || 'US',
+        dialCode: c.dial_code || '+1'
+      }));
+      setContacts(mappedContacts);
     } catch (error) {
       console.error("Error fetching contacts", error);
+      alert("Unable to fetch contacts data.");
     }
   };
 
   useEffect(() => {
-    fetchContacts();
-  }, []);
+    if (token) fetchContacts();
+  }, [token]);
 
   const handleAddContact = async () => {
     try {
-      await axios.post(`${API_URL}/api/contacts`, formData);
+      await axios.post(`${API_URL}/api/customers`, formData, { headers: { Authorization: `Bearer ${token}` } });
       fetchContacts();
       setOpenAdd(false);
       setFormData({ name: '', phone: '', email: '', countryCode: 'IN', dialCode: '+91', source: '', tag: 'Cold', campaign: '' });
@@ -55,14 +72,58 @@ function Contacts() {
     }
   };
 
-  const filteredContacts = contacts.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) || 
-    c.phone.includes(search) ||
-    c.email.includes(search)
-  );
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const csvData = event.target.result;
+      const lines = csvData.split(/\r?\n/);
+      if (lines.length < 2) return alert("CSV file is empty or missing headers.");
+      
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const newContacts = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const values = lines[i].split(',').map(v => v.trim());
+        let contact = { countryCode: 'US', dialCode: '+1' }; // defaults
+        headers.forEach((h, index) => {
+          if (h.includes('name')) contact.name = values[index];
+          if (h.includes('phone') || h.includes('number')) contact.phone = values[index];
+          if (h.includes('email')) contact.email = values[index];
+          if (h.includes('source')) contact.source = values[index];
+          if (h.includes('tag')) contact.tag = values[index];
+          if (h.includes('campaign')) contact.campaign = values[index];
+        });
+        if (contact.name && contact.phone) newContacts.push(contact);
+      }
+      
+      if (newContacts.length === 0) {
+        return alert("No valid contacts found in the CSV. Please ensure you have 'name' and 'phone' columns.");
+      }
+
+      try {
+        await axios.post(`${API_URL}/api/contacts/import`, { contacts: newContacts }, { headers: { Authorization: `Bearer ${token}` } });
+        alert(`Successfully imported ${newContacts.length} contacts!`);
+        fetchContacts();
+      } catch (err) {
+        console.error('Import failed', err);
+        alert("Failed to import contacts. Please check your network and try again.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // reset
+  };
 
   const handleImportClose = () => setImportAnchor(null);
   const handleExportClose = () => setExportAnchor(null);
+
+  const filteredContacts = contacts.filter(c => 
+    (c.name || '').toLowerCase().includes(search.toLowerCase()) || 
+    (c.phone || '').includes(search) ||
+    (c.email || '').toLowerCase().includes(search.toLowerCase())
+  );
 
   const getTagColor = (tag) => {
     switch(tag?.toLowerCase()) {
@@ -82,6 +143,22 @@ function Contacts() {
           <Typography variant="body2" color="text.secondary">Manage your leads, segment audiences, and sync with Google Sheets.</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
+          <input 
+            type="file" 
+            accept=".csv" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            onChange={handleImportCSV} 
+          />
+          <Button 
+            variant="outlined" 
+            startIcon={<CloudUpload />} 
+            onClick={() => fileInputRef.current?.click()}
+            sx={{ bgcolor: 'background.paper' }}
+          >
+            Import CSV
+          </Button>
+
           <Button 
             variant="outlined" 
             startIcon={<CloudDownload />} 

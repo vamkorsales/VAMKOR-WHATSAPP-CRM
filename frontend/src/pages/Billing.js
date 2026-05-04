@@ -1,17 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { 
   Box, Typography, Paper, Grid, Button, Switch, Divider, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip, TextField, MenuItem, FormControlLabel, Card, CardContent
 } from '@mui/material';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import { useAuth } from '../AuthContext';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 function Billing() {
+  const { token } = useAuth();
   const [billingCycle, setBillingCycle] = useState('Monthly');
   const [autoRenew, setAutoRenew] = useState(true);
-  const [walletBalance] = useState(450.00);
+  const [walletBalance, setWalletBalance] = useState(0.00);
+  const [plan, setPlan] = useState('Free');
+
+  useEffect(() => {
+    if (token) fetchBilling();
+  }, [token]);
+
+  const fetchBilling = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/billing`, { headers: { Authorization: `Bearer ${token}` } });
+      setWalletBalance(res.data.wallet_balance || 0);
+      setPlan(res.data.plan || 'Free');
+    } catch (err) {
+      console.error('Failed to fetch billing info', err);
+    }
+  };
+
+  const handleTopUp = async () => {
+    const amountStr = window.prompt("Enter amount to add to your wallet ($):", "100");
+    if (!amountStr) return;
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) return alert("Invalid amount");
+
+    try {
+      const res = await axios.post(`${API_URL}/api/billing/topup`, { amount }, { headers: { Authorization: `Bearer ${token}` } });
+      setWalletBalance(res.data.wallet_balance);
+      alert(`Successfully added $${amount} to your wallet!`);
+    } catch (err) {
+      console.error('Failed to top up', err);
+      alert('Failed to process payment.');
+    }
+  };
 
   const invoices = [
-    { id: 'INV-2026-001', client: 'Vamkor HQ', plan: 'Enterprise Hybrid', amount: 1200, gst: 216, total: 1416, status: 'Paid', date: '2026-04-01' },
+    { id: 'INV-2026-001', client: 'Vamkor HQ', plan: plan, amount: 1200, gst: 216, total: 1416, status: 'Paid', date: '2026-04-01' },
     { id: 'INV-2026-002', client: 'Vamkor HQ', plan: 'Usage Overage', amount: 150, gst: 27, total: 177, status: 'Pending', date: '2026-04-15' },
   ];
 
@@ -22,14 +58,16 @@ function Billing() {
       {/* Credit Wallet & Usage Overview */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
-          <Card elevation={1} sx={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white' }}>
+          <Card elevation={1} sx={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', height: '100%' }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ opacity: 0.9 }}>Credit Wallet</Typography>
                 <AccountBalanceWalletIcon color="success" />
               </Box>
-              <Typography variant="h3" fontWeight="bold" gutterBottom>${walletBalance.toFixed(2)}</Typography>
-              <Button variant="contained" color="success" size="small" fullWidth>➕ Add Funds</Button>
+              <Typography variant="h3" fontWeight="bold" gutterBottom>${parseFloat(walletBalance).toFixed(2)}</Typography>
+              <Button variant="contained" color="success" size="small" fullWidth onClick={handleTopUp}>
+                ➕ Add Funds (Mock Stripe)
+              </Button>
             </CardContent>
           </Card>
         </Grid>
@@ -60,7 +98,7 @@ function Billing() {
 
       {/* Subscription Management */}
       <Paper elevation={1} sx={{ p: 3 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>Subscription Management</Typography>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>Subscription Management (Current: {plan})</Typography>
         <Divider sx={{ mb: 3 }} />
         
         <Grid container spacing={4}>
@@ -100,7 +138,7 @@ function Billing() {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant="h6" fontWeight="bold">Invoices & Statements</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" size="small" color="primary">Pay via Stripe</Button>
+            <Button variant="outlined" size="small" color="primary" onClick={handleTopUp}>Pay via Stripe</Button>
             <Button variant="outlined" size="small" color="secondary">Pay via Razorpay</Button>
           </Box>
         </Box>

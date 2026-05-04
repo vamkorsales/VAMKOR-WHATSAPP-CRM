@@ -1,55 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Switch, Chip, Grid, Card, CardContent, Button,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel, IconButton
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { useAuth } from '../AuthContext';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 // Vibrant header gradient for "interesting colors"
 const headerGradient = 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)';
 
 function Campaigns() {
-  const [campaigns, setCampaigns] = useState([
-    { 
-      id: 1, name: 'Black Friday Blast', type: 'Marketing', status: 'Active', 
-      balanceLeft: 550, sent: 450, delivered: 440, opened: 300, replied: 85, failed: 10, 
-      dataAdded: 1000, assignedAgent: 'Pratiksha', openTime: '2.5 hrs', language: 'English', approval: 'Approved', totalSpent: 125.50
-    },
-    { 
-      id: 2, name: 'Welcome Series', type: 'Utility', status: 'Paused', 
-      balanceLeft: 12000, sent: 1200, delivered: 1195, opened: 900, replied: 200, failed: 5, 
-      dataAdded: 5000, assignedAgent: 'Auto-Bot', openTime: '1 hr', language: 'Multi-lingual', approval: 'Pending', totalSpent: 450.00
-    },
-    { 
-      id: 3, name: 'EMI Notifications', type: 'Finance', status: 'Active', 
-      balanceLeft: 4000, sent: 320, delivered: 320, opened: 310, replied: 15, failed: 0, 
-      dataAdded: 320, assignedAgent: 'System', openTime: '30 mins', language: 'Hindi', approval: 'Approved', totalSpent: 85.20
-    }
-  ]);
-
+  const { token } = useAuth();
+  const [campaigns, setCampaigns] = useState([]);
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', type: 'Marketing', language: 'English', trigger: '' });
 
-  const handleToggle = (id) => {
-    setCampaigns(campaigns.map(c => 
-      c.id === id ? { ...c, status: c.status === 'Active' ? 'Paused' : 'Active' } : c
-    ));
+  useEffect(() => {
+    if (token) fetchCampaigns();
+  }, [token]);
+
+  const fetchCampaigns = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/campaigns`, { headers: { Authorization: `Bearer ${token}` } });
+      setCampaigns(res.data);
+    } catch (err) {
+      console.error('Failed to fetch campaigns', err);
+    }
   };
 
-  const handleCreate = () => {
-    setCampaigns([...campaigns, {
-      id: Date.now(),
-      ...formData,
-      status: 'Paused', balanceLeft: 0, sent: 0, delivered: 0, opened: 0, replied: 0, failed: 0, dataAdded: 0, assignedAgent: 'Unassigned', openTime: '-', approval: 'Pending', totalSpent: 0
-    }]);
-    setOpen(false);
+  const handleToggle = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'Active' ? 'Paused' : 'Active';
+    // Optimistic UI update
+    setCampaigns(campaigns.map(c => c.id === id ? { ...c, status: newStatus } : c));
+    try {
+      await axios.put(`${API_URL}/api/campaigns/${id}`, { status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+    } catch (err) {
+      console.error('Failed to toggle campaign', err);
+      fetchCampaigns(); // Revert on failure
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this campaign? This action cannot be undone.")) return;
+    try {
+      await axios.delete(`${API_URL}/api/campaigns/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setCampaigns(campaigns.filter(c => c.id !== id));
+    } catch (err) {
+      console.error('Failed to delete campaign', err);
+    }
+  };
+
+  const handleCreate = async () => {
+    try {
+      const res = await axios.post(`${API_URL}/api/campaigns`, formData, { headers: { Authorization: `Bearer ${token}` } });
+      setCampaigns([res.data, ...campaigns]);
+      setOpen(false);
+      setFormData({ name: '', type: 'Marketing', language: 'English', trigger: '' });
+    } catch (err) {
+      console.error('Failed to create campaign', err);
+    }
   };
 
   // Aggregate metrics
-  const totalSent = campaigns.reduce((acc, c) => acc + c.sent, 0);
-  const totalOpened = campaigns.reduce((acc, c) => acc + c.opened, 0);
-  const totalFailed = campaigns.reduce((acc, c) => acc + c.failed, 0);
-  const aggregateSpent = campaigns.reduce((acc, c) => acc + c.totalSpent, 0);
+  const totalSent = campaigns.reduce((acc, c) => acc + (c.sent || 0), 0);
+  const totalOpened = campaigns.reduce((acc, c) => acc + (c.opened || 0), 0);
+  const totalFailed = campaigns.reduce((acc, c) => acc + (c.failed || 0), 0);
+  const aggregateSpent = campaigns.reduce((acc, c) => acc + (c.budget_used || 0), 0);
 
   return (
     <Box>
@@ -123,32 +143,42 @@ function Campaigns() {
                 <TableCell sx={{ fontWeight: 'bold' }}>Meta Approval</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Language</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Toggle</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
+              {campaigns.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                    No campaigns found. Click "Create Campaign" to get started.
+                  </TableCell>
+                </TableRow>
+              ) : null}
               {campaigns.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>
                     <Typography fontWeight="bold">{c.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">Agent: {c.assignedAgent}</Typography>
+                    <Typography variant="caption" color="text.secondary">Agent: {c.assigned_agent}</Typography>
                   </TableCell>
                   <TableCell>
                     <Chip label={c.type} size="small" sx={{ bgcolor: c.type === 'Finance' ? '#FEF3C7' : c.type === 'Marketing' ? '#DBEAFE' : '#E0E7FF' }} />
                   </TableCell>
-                  <TableCell>{c.dataAdded}</TableCell>
+                  <TableCell>{c.data_added}</TableCell>
                   <TableCell>{c.sent} / <Typography component="span" color="success.main">{c.delivered}</Typography></TableCell>
                   <TableCell>{c.opened} / <Typography component="span" color="primary">{c.replied}</Typography></TableCell>
-                  <TableCell fontWeight="bold" color="#D97706">${c.totalSpent.toFixed(2)}</TableCell>
+                  <TableCell fontWeight="bold" color="#D97706">${(c.budget_used || 0).toFixed(2)}</TableCell>
                   <TableCell>
-                    <Chip label={c.approval} size="small" color={c.approval === 'Approved' ? 'success' : 'warning'} variant="outlined" />
+                    <Chip label={c.approval_status} size="small" color={c.approval_status === 'Approved' ? 'success' : 'warning'} variant="outlined" />
                   </TableCell>
                   <TableCell>{c.language}</TableCell>
                   <TableCell>
                     <Chip label={c.status} color={c.status === 'Active' ? 'success' : 'default'} size="small" />
                   </TableCell>
-                  <TableCell>
-                    <Switch checked={c.status === 'Active'} onChange={() => handleToggle(c.id)} color="primary" />
+                  <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Switch checked={c.status === 'Active'} onChange={() => handleToggle(c.id, c.status)} color="primary" />
+                    <IconButton color="error" size="small" onClick={() => handleDelete(c.id)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))}
@@ -192,7 +222,7 @@ function Campaigns() {
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreate}>Draft Campaign</Button>
+          <Button variant="contained" onClick={handleCreate} disabled={!formData.name}>Draft Campaign</Button>
         </DialogActions>
       </Dialog>
     </Box>

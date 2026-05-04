@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     agency_id UUID PRIMARY KEY,
     plan TEXT DEFAULT 'Free',
     status TEXT DEFAULT 'active',
+    wallet_balance NUMERIC DEFAULT 0.00,
     next_billing_date TIMESTAMP WITH TIME ZONE
 );
 

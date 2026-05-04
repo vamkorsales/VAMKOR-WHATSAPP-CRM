@@ -120,7 +120,7 @@ app.get('/api/messages/:customerId', checkJwt, async (req, res) => {
 });
 
 app.post('/api/messages', checkJwt, async (req, res) => {
-  const { customerId, message, direction } = req.body;
+  const { customerId, message, direction, mediaUrl, mediaType } = req.body;
   
   if (direction === 'OUTBOUND') {
     // Fetch WhatsApp Credentials from Settings
@@ -148,23 +148,38 @@ app.post('/api/messages', checkJwt, async (req, res) => {
     if (custErr || !customer) return res.status(404).json({ error: 'Customer not found' });
 
     try {
+      // Format payload for Meta API (Text or Media)
+      let payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: customer.phone,
+        type: mediaUrl ? mediaType : 'text',
+      };
+
+      if (mediaUrl) {
+        payload[mediaType] = { link: mediaUrl };
+        if (mediaType === 'document') {
+          payload[mediaType].filename = message.replace('[Media] ', ''); // extract original filename
+        }
+      } else {
+        payload.text = { preview_url: false, body: message };
+      }
+
       // Send to Meta API
       await axios.post(
         `https://graph.facebook.com/v19.0/${config.phoneNumberId}/messages`,
-        {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: customer.phone,
-          type: 'text',
-          text: { preview_url: false, body: message }
-        },
+        payload,
         { headers: { 'Authorization': `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' } }
       );
       
       // Save to DB
+      // Note: we can't save media_url directly since we didn't add it to supabase_schema.sql originally.
+      // So we will just save the media link in the message body for now, or append it to the message.
+      const finalMessageText = mediaUrl ? `${message}\n\nMedia Link: ${mediaUrl}` : message;
+
       const { data: msgData, error: msgErr } = await supabase
         .from('messages')
-        .insert([{ agency_id: req.user.agency_id, customer_id: customerId, message, direction }])
+        .insert([{ agency_id: req.user.agency_id, customer_id: customerId, message: finalMessageText, direction }])
         .select().single();
         
       if (msgErr) return res.status(500).json({ error: msgErr.message });
@@ -184,6 +199,115 @@ app.post('/api/messages', checkJwt, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
   }
+});
+
+// --- Campaigns ---
+app.get('/api/campaigns', checkJwt, async (req, res) => {
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select('*')
+    .eq('agency_id', req.user.agency_id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/campaigns', checkJwt, async (req, res) => {
+  const { name, type, language, trigger } = req.body;
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert([{
+      agency_id: req.user.agency_id,
+      name, type, language, assigned_agent: req.user.email,
+      status: 'Paused', approval_status: 'Pending'
+    }])
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.put('/api/campaigns/:id', checkJwt, async (req, res) => {
+  const { status } = req.body;
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update({ status })
+    .eq('id', req.params.id)
+    .eq('agency_id', req.user.agency_id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.delete('/api/campaigns/:id', checkJwt, async (req, res) => {
+  const { error } = await supabase
+    .from('campaigns')
+    .delete()
+    .eq('id', req.params.id)
+    .eq('agency_id', req.user.agency_id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// --- Billing ---
+app.get('/api/billing', checkJwt, async (req, res) => {
+  // Try to fetch subscription/wallet
+  let { data, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('agency_id', req.user.agency_id)
+    .single();
+
+  // If none exists, create a default free tier
+  if (!data) {
+    const { data: newSub, error: insertErr } = await supabase
+      .from('subscriptions')
+      .insert([{ agency_id: req.user.agency_id, plan: 'Free', wallet_balance: 0.00 }])
+      .select().single();
+    
+    if (insertErr) return res.status(500).json({ error: insertErr.message });
+    data = newSub;
+  }
+  
+  res.json(data);
+});
+
+app.post('/api/billing/topup', checkJwt, async (req, res) => {
+  const { amount } = req.body;
+  
+  // First get current balance
+  const { data: current } = await supabase
+    .from('subscriptions')
+    .select('wallet_balance')
+    .eq('agency_id', req.user.agency_id)
+    .single();
+    
+  const currentBalance = current?.wallet_balance || 0;
+  const newBalance = parseFloat(currentBalance) + parseFloat(amount);
+
+  // Update balance
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .update({ wallet_balance: newBalance })
+    .eq('agency_id', req.user.agency_id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  
+  // Log payment
+  await supabase.from('payments').insert([{
+    agency_id: req.user.agency_id,
+    amount: amount,
+    status: 'Completed'
+  }]);
+
+  res.json(data);
 });
 
 // --- Integration Settings ---
