@@ -6,11 +6,17 @@ const { supabase } = require('./supabase');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:3000'];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(express.json({ limit: '5mb' })); // limit JSON payloads
 app.set('trust proxy', 1);
 
 // Global API Rate Limiter
+const helmet = require('helmet');
+app.use(helmet());
+const morgan = require('morgan');
+app.use(morgan('combined'));
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
@@ -94,17 +100,39 @@ app.get('/api/customers', checkJwt, async (req, res) => {
 
 app.post('/api/customers', checkJwt, async (req, res) => {
   const { name, phone, email, countryCode, dialCode, source, tag, campaign } = req.body;
-  
+  // Validation
+  if (!name || !phone) {
+    return res.status(400).json({ error: 'Name and phone are required.' });
+  }
+  const safeName = String(name).trim().substring(0, 255);
+  const safePhone = String(phone).trim().substring(0, 50);
+  const safeEmail = email ? String(email).trim().substring(0, 255) : null;
+  const safeSource = source ? String(source).trim().substring(0, 100) : null;
+  const safeTag = tag ? String(tag).trim().substring(0, 50) : null;
+  const safeCampaign = campaign ? String(campaign).trim().substring(0, 100) : null;
+
   const { data, error } = await supabase
     .from('customers')
-    .insert([{
-      agency_id: req.user.agency_id,
-      name, phone, email, country_code: countryCode, dial_code: dialCode, source, tag, campaign
-    }])
+    .insert([
+      {
+        agency_id: req.user.agency_id,
+        name: safeName,
+        phone: safePhone,
+        email: safeEmail,
+        country_code: countryCode,
+        dial_code: dialCode,
+        source: safeSource,
+        tag: safeTag,
+        campaign: safeCampaign,
+      },
+    ])
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[POST /api/customers] Error:', error.message);
+    return res.status(500).json({ error: 'Failed to add contact.' });
+  }
   res.json(data);
 });
 
