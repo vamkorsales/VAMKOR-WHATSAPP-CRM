@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Grid, Alert, MenuItem } from '@mui/material';
-import axios from 'axios';
+import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 // Sample list of countries for the dropdown
 const countries = [
@@ -41,20 +39,31 @@ function Signup() {
     try {
       const finalCountry = formData.country === 'Other' ? formData.customCountry : formData.country;
 
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
-        username: formData.username,
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
-        contactNumber: formData.contactNumber,
-        companyName: formData.companyName,
-        country: finalCountry,
-        password: formData.password
+        password: formData.password,
+        options: {
+          data: {
+            username: formData.username,
+            contact_number: formData.contactNumber,
+            company_name: formData.companyName,
+            country: finalCountry
+          }
+        }
       });
 
-      // Automatically log the user in after successful registration
-      login(response.data.token, response.data.user);
-      navigate('/dashboard');
+      if (error) throw error;
+
+      // Automatically log the user in after successful registration (if email confirmation is disabled in Supabase)
+      if (data.session) {
+        login(data.session.access_token, data.user);
+        navigate('/dashboard');
+      } else {
+        // If email confirmation is enabled, session will be null
+        setError('Please check your email to confirm your account before logging in.');
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setError(err.message || 'Registration failed. Please try again.');
     }
   };
 
@@ -74,7 +83,7 @@ function Signup() {
           Create your account to supercharge your WhatsApp outreach.
         </Typography>
 
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+        {error && <Alert severity={error.includes('email') ? "info" : "error"} sx={{ mb: 3 }}>{error}</Alert>}
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>

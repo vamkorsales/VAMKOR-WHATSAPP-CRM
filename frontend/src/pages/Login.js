@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
-import axios from 'axios';
+import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 function Login() {
   const navigate = useNavigate();
@@ -12,10 +10,8 @@ function Login() {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    twoFactorToken: ''
+    password: ''
   });
-  const [requires2FA, setRequires2FA] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -26,15 +22,21 @@ function Login() {
     setError('');
 
     try {
-      const response = await axios.post(`${API_URL}/api/auth/login`, formData);
-      if (response.status === 206 || response.data.requires2FA) {
-        setRequires2FA(true);
-        return;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (error) throw error;
+      
+      // The AuthContext will automatically pick up the session change,
+      // but we can manually trigger the login context if needed or just navigate.
+      if (data.session) {
+         login(data.session.access_token, data.user);
+         navigate('/dashboard');
       }
-      login(response.data.token, response.data.user);
-      navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
+      setError(err.message || 'Login failed. Please check your credentials.');
     }
   };
 
@@ -58,30 +60,17 @@ function Login() {
 
         <form onSubmit={handleSubmit}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {!requires2FA ? (
-              <>
-                <TextField 
-                  required fullWidth label="Email Address" name="email" type="email" 
-                  value={formData.email} onChange={handleChange} 
-                />
-                <TextField 
-                  required fullWidth label="Password" name="password" type="password" 
-                  value={formData.password} onChange={handleChange} 
-                />
-              </>
-            ) : (
-              <>
-                <Typography color="primary" sx={{ mb: 1, fontWeight: 'bold' }}>Two-Factor Authentication</Typography>
-                <TextField 
-                  required fullWidth label="6-Digit Authenticator Code" name="twoFactorToken" 
-                  value={formData.twoFactorToken} onChange={handleChange} 
-                  inputProps={{ maxLength: 6 }}
-                />
-              </>
-            )}
+            <TextField 
+              required fullWidth label="Email Address" name="email" type="email" 
+              value={formData.email} onChange={handleChange} 
+            />
+            <TextField 
+              required fullWidth label="Password" name="password" type="password" 
+              value={formData.password} onChange={handleChange} 
+            />
             
             <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 2, py: 1.5 }}>
-              {requires2FA ? 'Verify 2FA & Log In' : 'Log In'}
+              Log In
             </Button>
             
             <Typography textAlign="center" color="text.secondary">
