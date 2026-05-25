@@ -214,15 +214,20 @@ app.post('/api/messages', checkJwt, async (req, res) => {
     if (config.whatsappConnectionType === 'openwa') {
       const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
       const apiKey = getOpenWaApiKey();
-      const sessionId = `agency_${req.user.agency_id}`;
+      const sessionName = `agency_${req.user.agency_id}`;
 
       try {
+        // Fetch session UUID
+        const sessionsRes = await axios.get(`${openwaUrl}/api/sessions`, { headers: { 'X-API-Key': apiKey } });
+        const session = sessionsRes.data.find(s => s.name === sessionName);
+        if (!session) throw new Error('OpenWA session not initialized for this agency');
+
         const payload = {
           chatId: customer.phone.includes('@') ? customer.phone : `${customer.phone.replace(/[^0-9]/g, '')}@c.us`,
           text: mediaUrl ? `${message}\n\nMedia Link: ${mediaUrl}` : message
         };
 
-        await axios.post(`${openwaUrl}/api/sessions/${sessionId}/messages/send-text`, payload, {
+        await axios.post(`${openwaUrl}/api/sessions/${session.id}/messages/send-text`, payload, {
           headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' }
         });
       } catch (error) {
@@ -431,22 +436,35 @@ app.post('/api/integration', checkJwt, async (req, res) => {
 
 // --- OpenWA Proxy Routes ---
 app.post('/api/openwa/session/start', checkJwt, async (req, res) => {
-  const sessionId = `agency_${req.user.agency_id}`;
+  const sessionName = `agency_${req.user.agency_id}`;
   const apiKey = getOpenWaApiKey();
   const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
 
   try {
-    try {
-      await axios.post(`${openwaUrl}/api/sessions`, { name: sessionId }, {
+    let sessionId;
+    const getRes = await axios.get(`${openwaUrl}/api/sessions`, { headers: { 'X-API-Key': apiKey } });
+    const existing = getRes.data.find(s => s.name === sessionName);
+
+    if (existing) {
+      sessionId = existing.id;
+    } else {
+      const createRes = await axios.post(`${openwaUrl}/api/sessions`, { name: sessionName }, {
         headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' }
       });
-    } catch (e) {
-      if (e.response && e.response.status !== 409) throw e;
+      sessionId = createRes.data.id;
     }
 
-    await axios.post(`${openwaUrl}/api/sessions/${sessionId}/start`, {}, {
-      headers: { 'X-API-Key': apiKey }
-    });
+    try {
+      await axios.post(`${openwaUrl}/api/sessions/${sessionId}/start`, {}, {
+        headers: { 'X-API-Key': apiKey }
+      });
+    } catch (e) {
+      if (e.response && e.response.status === 400 && e.response.data?.message?.includes('already started')) {
+        console.log('OpenWA session already running, proceeding to QR fetch');
+      } else {
+        throw e;
+      }
+    }
 
     // Add webhook pointing back to our own server
     const myWebhookUrl = `${process.env.BACKEND_URL || 'http://host.docker.internal:5001'}/api/openwa/webhook/${req.user.agency_id}`;
@@ -470,12 +488,16 @@ app.post('/api/openwa/session/start', checkJwt, async (req, res) => {
 });
 
 app.get('/api/openwa/session/qr', checkJwt, async (req, res) => {
-  const sessionId = `agency_${req.user.agency_id}`;
+  const sessionName = `agency_${req.user.agency_id}`;
   const apiKey = getOpenWaApiKey();
   const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
 
   try {
-    const response = await axios.get(`${openwaUrl}/api/sessions/${sessionId}/qr`, {
+    const getRes = await axios.get(`${openwaUrl}/api/sessions`, { headers: { 'X-API-Key': apiKey } });
+    const session = getRes.data.find(s => s.name === sessionName);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    const response = await axios.get(`${openwaUrl}/api/sessions/${session.id}/qr`, {
       headers: { 'X-API-Key': apiKey }
     });
     res.json(response.data);
