@@ -6,17 +6,11 @@ import {
   Chip, Menu, MenuItem, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, Avatar, Tooltip, Divider, Badge, CircularProgress
 } from '@mui/material';
-import Search from '@mui/icons-material/Search';
-import CloudUpload from '@mui/icons-material/CloudUpload';
-import CloudDownload from '@mui/icons-material/CloudDownload';
-import PersonAdd from '@mui/icons-material/PersonAdd';
-import FilterList from '@mui/icons-material/FilterList';
-import MoreVert from '@mui/icons-material/MoreVert';
-import People from '@mui/icons-material/People';
-import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
-import WhatshotIcon from '@mui/icons-material/Whatshot';
-import AcUnitIcon from '@mui/icons-material/AcUnit';
-import DeleteOutline from '@mui/icons-material/DeleteOutline';
+import {
+  Search, CloudUpload, CloudDownload, PersonAdd, FilterList,
+  MoreVert, People, LocalFireDepartment, Whatshot as WhatshotIcon,
+  AcUnit as AcUnitIcon, Delete
+} from '@mui/icons-material';
 import { useAuth } from '../AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
@@ -375,7 +369,7 @@ function Contacts() {
         <MenuItem onClick={() => setMenuAnchor(null)}>Edit Contact</MenuItem>
         <Divider />
         <MenuItem sx={{ color: 'error.main' }} onClick={() => setMenuAnchor(null)}>
-          <DeleteOutline fontSize="small" sx={{ mr: 1 }} /> Delete Contact
+          <Delete fontSize="small" sx={{ mr: 1 }} /> Delete Contact
         </MenuItem>
       </Menu>
 

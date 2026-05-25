@@ -3,7 +3,22 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const axios = require('axios');
 const { supabase } = require('./supabase');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+const getOpenWaApiKey = () => {
+  if (process.env.OPENWA_API_KEY) return process.env.OPENWA_API_KEY;
+  try {
+    const keyPath = path.join(__dirname, '../whatsapp-gateway/data/.api-key');
+    if (fs.existsSync(keyPath)) {
+      return fs.readFileSync(keyPath, 'utf8').trim();
+    }
+  } catch (e) {
+    console.error('Could not read OpenWA API key file:', e.message);
+  }
+  return 'vamkor_openwa_secret';
+};
 
 const app = express();
 const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:3000'];
@@ -198,7 +213,7 @@ app.post('/api/messages', checkJwt, async (req, res) => {
     const config = settings.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
     if (config.whatsappConnectionType === 'openwa') {
       const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
-      const apiKey = process.env.OPENWA_API_KEY || 'vamkor_openwa_secret';
+      const apiKey = getOpenWaApiKey();
       const sessionId = `agency_${req.user.agency_id}`;
 
       try {
@@ -262,10 +277,6 @@ app.post('/api/messages', checkJwt, async (req, res) => {
       if (msgErr) return res.status(500).json({ error: msgErr.message });
       return res.json(msgData);
 
-    } catch (error) {
-      console.error('WhatsApp API Error:', error.response?.data || error.message);
-      return res.status(500).json({ error: 'Failed to send WhatsApp message', details: error.response?.data });
-    }
   } else {
     // Just save internal note or inbound
     const { data, error } = await supabase
@@ -421,7 +432,7 @@ app.post('/api/integration', checkJwt, async (req, res) => {
 // --- OpenWA Proxy Routes ---
 app.post('/api/openwa/session/start', checkJwt, async (req, res) => {
   const sessionId = `agency_${req.user.agency_id}`;
-  const apiKey = process.env.OPENWA_API_KEY || 'vamkor_openwa_secret';
+  const apiKey = getOpenWaApiKey();
   const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
 
   try {
@@ -460,7 +471,7 @@ app.post('/api/openwa/session/start', checkJwt, async (req, res) => {
 
 app.get('/api/openwa/session/qr', checkJwt, async (req, res) => {
   const sessionId = `agency_${req.user.agency_id}`;
-  const apiKey = process.env.OPENWA_API_KEY || 'vamkor_openwa_secret';
+  const apiKey = getOpenWaApiKey();
   const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
 
   try {

@@ -9,25 +9,30 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const loadUser = async (session) => {
       if (session) {
-        setUser(session.user);
-        setToken(session.access_token);
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setUser(session.user);
+        let role = 'ADMIN'; // Default
+        try {
+          const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+          if (data && data.role) role = data.role;
+        } catch (err) {}
+        setUser({ ...session.user, role });
         setToken(session.access_token);
       } else {
         setUser(null);
         setToken(null);
       }
       setLoading(false);
+    };
+
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      loadUser(session);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadUser(session);
     });
 
     return () => subscription.unsubscribe();
