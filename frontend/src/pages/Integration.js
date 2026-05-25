@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Box, Typography, Paper, Grid, Button, TextField, Select, MenuItem, 
-  FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, IconButton, Menu, Alert, Snackbar
+  FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, IconButton, Menu, Alert, Snackbar, Tabs, Tab, CircularProgress
 } from '@mui/material';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -23,6 +23,12 @@ function Integration() {
     accessToken: ''
   });
 
+  // OpenWA State
+  const [integrationTab, setIntegrationTab] = useState(0);
+  const [qrCodeData, setQrCodeData] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [waConnectionType, setWaConnectionType] = useState('meta');
+
   const handleWaMenuOpen = (event) => setWaMenuAnchor(event.currentTarget);
   const handleWaMenuClose = () => setWaMenuAnchor(null);
 
@@ -38,6 +44,10 @@ function Integration() {
           whatsappBusinessAccountId: res.data.whatsappBusinessAccountId || '',
           accessToken: res.data.accessToken || ''
         });
+        if (res.data.whatsappConnectionType) {
+          setWaConnectionType(res.data.whatsappConnectionType);
+          setIntegrationTab(res.data.whatsappConnectionType === 'openwa' ? 1 : 0);
+        }
       } catch (error) {
         console.error('Failed to fetch settings:', error);
       }
@@ -48,15 +58,56 @@ function Integration() {
   const handleSaveMetaConfig = async () => {
     setLoading(true);
     try {
-      await axios.post('http://localhost:5001/api/integration', metaConfig, {
+      await axios.post('http://localhost:5001/api/integration', {
+        ...metaConfig,
+        whatsappConnectionType: 'meta'
+      }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccessMsg('Meta WhatsApp API configuration saved successfully!');
+      setWaConnectionType('meta');
     } catch (error) {
       console.error('Failed to save settings:', error);
       alert('Failed to save settings');
     }
     setLoading(false);
+  };
+
+  const handleOpenWASetup = async () => {
+    setQrLoading(true);
+    try {
+      // Start session
+      await axios.post('http://localhost:5001/api/openwa/session/start', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Wait a moment for engine to initialize
+      setTimeout(async () => {
+        try {
+          const res = await axios.get('http://localhost:5001/api/openwa/session/qr', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setQrCodeData(res.data.qrCode);
+          
+          // Save connection type
+          await axios.post('http://localhost:5001/api/integration', {
+            whatsappConnectionType: 'openwa'
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setWaConnectionType('openwa');
+          setSuccessMsg('Session started! Scan the QR code with WhatsApp.');
+        } catch (qrErr) {
+           console.error('QR Fetch Error:', qrErr);
+           alert(qrErr.response?.data?.error || 'Failed to fetch QR. Try again.');
+        }
+        setQrLoading(false);
+      }, 5000); // 5 sec wait
+    } catch (error) {
+      console.error('Failed to start OpenWA:', error);
+      alert('Failed to start WhatsApp Web session');
+      setQrLoading(false);
+    }
   };
 
   // Mock API Keys
@@ -76,52 +127,100 @@ function Integration() {
         <Typography color="text.secondary">Manage your API Keys and WhatsApp Cloud API connections here.</Typography>
       </Box>
 
-      {/* Meta API Configuration */}
-      <Paper elevation={1} sx={{ p: 3, borderLeft: '4px solid #06c167' }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>Meta WhatsApp Cloud API Configuration</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          To connect your own WhatsApp Business number, create a Meta Developer App, add the WhatsApp product, and generate a system user token. Enter those details below to start receiving and sending messages.
-        </Typography>
-        
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <TextField 
-              fullWidth 
-              label="Phone Number ID" 
-              variant="outlined" 
-              value={metaConfig.phoneNumberId}
-              onChange={(e) => setMetaConfig({...metaConfig, phoneNumberId: e.target.value})}
-              helperText="Found in Meta App -> WhatsApp -> Getting Started"
-            />
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={integrationTab} onChange={(e, v) => setIntegrationTab(v)}>
+          <Tab label="Meta Cloud API (Official)" />
+          <Tab label="WhatsApp Web (QR Code)" />
+        </Tabs>
+      </Box>
+
+      {integrationTab === 0 && (
+        <Paper elevation={1} sx={{ p: 3, borderLeft: '4px solid #06c167' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight="bold">Meta WhatsApp Cloud API Configuration</Typography>
+            {waConnectionType === 'meta' && <Chip label="Active Provider" color="success" size="small" />}
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            To connect your own WhatsApp Business number, create a Meta Developer App, add the WhatsApp product, and generate a system user token. Enter those details below to start receiving and sending messages.
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <TextField 
+                fullWidth 
+                label="Phone Number ID" 
+                variant="outlined" 
+                value={metaConfig.phoneNumberId}
+                onChange={(e) => setMetaConfig({...metaConfig, phoneNumberId: e.target.value})}
+                helperText="Found in Meta App -> WhatsApp -> Getting Started"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField 
+                fullWidth 
+                label="WhatsApp Business Account ID" 
+                variant="outlined" 
+                value={metaConfig.whatsappBusinessAccountId}
+                onChange={(e) => setMetaConfig({...metaConfig, whatsappBusinessAccountId: e.target.value})}
+                helperText="Found in Meta App -> WhatsApp -> Getting Started"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField 
+                fullWidth 
+                label="Permanent Access Token" 
+                variant="outlined" 
+                type="password"
+                value={metaConfig.accessToken}
+                onChange={(e) => setMetaConfig({...metaConfig, accessToken: e.target.value})}
+                helperText="System User Token with messaging permissions"
+              />
+            </Grid>
+            <Grid item xs={12}>
+               <Button variant="contained" color="success" onClick={handleSaveMetaConfig} disabled={loading}>
+                 {loading ? 'Saving...' : 'Save Meta Configuration'}
+               </Button>
+            </Grid>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <TextField 
-              fullWidth 
-              label="WhatsApp Business Account ID" 
-              variant="outlined" 
-              value={metaConfig.whatsappBusinessAccountId}
-              onChange={(e) => setMetaConfig({...metaConfig, whatsappBusinessAccountId: e.target.value})}
-              helperText="Found in Meta App -> WhatsApp -> Getting Started"
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TextField 
-              fullWidth 
-              label="Permanent Access Token" 
-              variant="outlined" 
-              type="password"
-              value={metaConfig.accessToken}
-              onChange={(e) => setMetaConfig({...metaConfig, accessToken: e.target.value})}
-              helperText="System User Token with messaging permissions"
-            />
-          </Grid>
-          <Grid item xs={12}>
-             <Button variant="contained" color="success" onClick={handleSaveMetaConfig} disabled={loading}>
-               {loading ? 'Saving...' : 'Save Configuration'}
-             </Button>
-          </Grid>
-        </Grid>
-      </Paper>
+        </Paper>
+      )}
+
+      {integrationTab === 1 && (
+        <Paper elevation={1} sx={{ p: 3, borderLeft: '4px solid #25D366' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight="bold">WhatsApp Web Configuration (OpenWA)</Typography>
+            {waConnectionType === 'openwa' && <Chip label="Active Provider" color="success" size="small" />}
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Link your personal or business WhatsApp account directly by scanning a QR Code. This bypasses the Meta API restrictions and costs.
+          </Typography>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4, bgcolor: '#f8fafc', borderRadius: 2 }}>
+            <QrCode2Icon sx={{ fontSize: 60, color: '#94a3b8', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>Link your device</Typography>
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3, maxWidth: 400 }}>
+              Click the button below to start the WhatsApp engine and generate a unique QR code. Open WhatsApp on your phone and scan it.
+            </Typography>
+
+            {qrCodeData ? (
+              <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', mb: 3 }}>
+                 <img src={qrCodeData} alt="WhatsApp QR Code" style={{ width: 256, height: 256 }} />
+              </Box>
+            ) : qrLoading ? (
+              <CircularProgress sx={{ mb: 3 }} />
+            ) : null}
+
+            <Button 
+              variant="contained" 
+              sx={{ bgcolor: '#25D366', '&:hover': { bgcolor: '#128C7E' } }}
+              onClick={handleOpenWASetup}
+              disabled={qrLoading}
+            >
+              {qrLoading ? 'Starting Engine...' : qrCodeData ? 'Regenerate QR Code' : 'Generate QR Code'}
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       {/* WhatsApp Numbers Management */}
       <Paper elevation={1} sx={{ p: 3 }}>

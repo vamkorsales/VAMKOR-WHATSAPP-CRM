@@ -191,49 +191,63 @@ app.post('/api/messages', checkJwt, async (req, res) => {
       .from('settings')
       .select('key, value')
       .eq('agency_id', req.user.agency_id)
-      .in('key', ['accessToken', 'phoneNumberId']);
+      .in('key', ['accessToken', 'phoneNumberId', 'whatsappConnectionType']);
       
     if (setErr || !settings) return res.status(500).json({ error: 'Failed to retrieve settings' });
     
     const config = settings.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
-    if (!config.accessToken || !config.phoneNumberId) {
-       return res.status(400).json({ error: 'WhatsApp API credentials not configured' });
-    }
+    if (config.whatsappConnectionType === 'openwa') {
+      const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
+      const apiKey = process.env.OPENWA_API_KEY || 'vamkor_openwa_secret';
+      const sessionId = `agency_${req.user.agency_id}`;
 
-    // Fetch Customer Phone
-    const { data: customer, error: custErr } = await supabase
-      .from('customers')
-      .select('phone')
-      .eq('id', customerId)
-      .eq('agency_id', req.user.agency_id)
-      .single();
+      try {
+        const payload = {
+          chatId: customer.phone.includes('@') ? customer.phone : `${customer.phone.replace(/[^0-9]/g, '')}@c.us`,
+          text: mediaUrl ? `${message}\n\nMedia Link: ${mediaUrl}` : message
+        };
 
-    if (custErr || !customer) return res.status(404).json({ error: 'Customer not found' });
-
-    try {
-      // Format payload for Meta API (Text or Media)
-      let payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: customer.phone,
-        type: mediaUrl ? mediaType : 'text',
-      };
-
-      if (mediaUrl) {
-        payload[mediaType] = { link: mediaUrl };
-        if (mediaType === 'document') {
-          payload[mediaType].filename = message.replace('[Media] ', ''); // extract original filename
-        }
-      } else {
-        payload.text = { preview_url: false, body: message };
+        await axios.post(`${openwaUrl}/api/sessions/${sessionId}/messages/send-text`, payload, {
+          headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('OpenWA API Error:', error.response?.data || error.message);
+        return res.status(500).json({ error: 'Failed to send OpenWA message', details: error.response?.data });
+      }
+    } else {
+      if (!config.accessToken || !config.phoneNumberId) {
+         return res.status(400).json({ error: 'WhatsApp API credentials not configured' });
       }
 
-      // Send to Meta API
-      await axios.post(
-        `https://graph.facebook.com/v19.0/${config.phoneNumberId}/messages`,
-        payload,
-        { headers: { 'Authorization': `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' } }
-      );
+      try {
+        // Format payload for Meta API (Text or Media)
+        let payload = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: customer.phone,
+          type: mediaUrl ? mediaType : 'text',
+        };
+
+        if (mediaUrl) {
+          payload[mediaType] = { link: mediaUrl };
+          if (mediaType === 'document') {
+            payload[mediaType].filename = message.replace('[Media] ', ''); // extract original filename
+          }
+        } else {
+          payload.text = { preview_url: false, body: message };
+        }
+
+        // Send to Meta API
+        await axios.post(
+          `https://graph.facebook.com/v19.0/${config.phoneNumberId}/messages`,
+          payload,
+          { headers: { 'Authorization': `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Meta API Error:', error.response?.data || error.message);
+        return res.status(500).json({ error: 'Failed to send Meta WhatsApp message', details: error.response?.data });
+      }
+    }
       
       // Save to DB
       // Note: we can't save media_url directly since we didn't add it to supabase_schema.sql originally.
@@ -395,12 +409,111 @@ app.post('/api/integration', checkJwt, async (req, res) => {
     { agency_id: req.user.agency_id, key: 'phoneNumberId', value: phoneNumberId },
     { agency_id: req.user.agency_id, key: 'whatsappBusinessAccountId', value: whatsappBusinessAccountId },
     { agency_id: req.user.agency_id, key: 'accessToken', value: accessToken },
-    { agency_id: req.user.agency_id, key: 'webhookVerified', value: 'true' }
+    { agency_id: req.user.agency_id, key: 'webhookVerified', value: 'true' },
+    { agency_id: req.user.agency_id, key: 'whatsappConnectionType', value: req.body.whatsappConnectionType || 'meta' }
   ];
 
   const { error } = await supabase.from('settings').upsert(settings);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
+});
+
+// --- OpenWA Proxy Routes ---
+app.post('/api/openwa/session/start', checkJwt, async (req, res) => {
+  const sessionId = `agency_${req.user.agency_id}`;
+  const apiKey = process.env.OPENWA_API_KEY || 'vamkor_openwa_secret';
+  const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
+
+  try {
+    try {
+      await axios.post(`${openwaUrl}/api/sessions`, { name: sessionId }, {
+        headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' }
+      });
+    } catch (e) {
+      if (e.response && e.response.status !== 409) throw e;
+    }
+
+    await axios.post(`${openwaUrl}/api/sessions/${sessionId}/start`, {}, {
+      headers: { 'X-API-Key': apiKey }
+    });
+
+    // Add webhook pointing back to our own server
+    const myWebhookUrl = `${process.env.BACKEND_URL || 'http://host.docker.internal:5001'}/api/openwa/webhook/${req.user.agency_id}`;
+    try {
+      await axios.post(`${openwaUrl}/api/sessions/${sessionId}/webhooks`, {
+        url: myWebhookUrl,
+        events: ['message.received'],
+        secret: 'vamkor_openwa_webhook_secret'
+      }, {
+        headers: { 'X-API-Key': apiKey }
+      });
+    } catch (e) {
+      console.warn('Could not set OpenWA webhook (maybe already exists)');
+    }
+
+    res.json({ success: true, sessionId });
+  } catch (err) {
+    console.error('OpenWA Start Error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to start OpenWA session' });
+  }
+});
+
+app.get('/api/openwa/session/qr', checkJwt, async (req, res) => {
+  const sessionId = `agency_${req.user.agency_id}`;
+  const apiKey = process.env.OPENWA_API_KEY || 'vamkor_openwa_secret';
+  const openwaUrl = process.env.OPENWA_URL || 'http://localhost:2785';
+
+  try {
+    const response = await axios.get(`${openwaUrl}/api/sessions/${sessionId}/qr`, {
+      headers: { 'X-API-Key': apiKey }
+    });
+    res.json(response.data);
+  } catch (err) {
+    if (err.response && err.response.status === 400) {
+       return res.status(400).json({ error: err.response.data.message || 'QR not ready or already connected' });
+    }
+    console.error('OpenWA QR Error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch QR code' });
+  }
+});
+
+// OpenWA Incoming Webhook
+app.post('/api/openwa/webhook/:agencyId', async (req, res) => {
+  // Webhook signature validation can be added here
+  const { agencyId } = req.params;
+  const { event, payload } = req.body;
+
+  if (event === 'message.received') {
+    const fromPhone = payload.message?.from?.replace('@c.us', '');
+    const msgBody = payload.message?.body || '[Media/Unsupported]';
+    const contactName = payload.message?.notifyName || 'Unknown';
+
+    if (!fromPhone || fromPhone.includes('@g.us')) return res.sendStatus(200); // Ignore groups
+
+    let { data: customer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('phone', fromPhone)
+      .eq('agency_id', agencyId)
+      .single();
+
+    if (!customer) {
+      const { data: newCust } = await supabase
+        .from('customers')
+        .insert([{ agency_id: agencyId, name: contactName, phone: fromPhone, source: 'WhatsApp Web', tag: 'New' }])
+        .select('id').single();
+      customer = newCust;
+    }
+    
+    if (customer) {
+      const msgId = payload.message?.id?.id || undefined;
+      await supabase
+        .from('messages')
+        .insert([{ id: msgId, agency_id: agencyId, customer_id: customer.id, message: msgBody, direction: 'INBOUND' }]);
+    }
+  }
+
+  res.sendStatus(200);
 });
 
 // --- Public Webhook ---
