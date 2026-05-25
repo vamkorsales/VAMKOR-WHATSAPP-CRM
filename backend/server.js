@@ -406,7 +406,7 @@ app.post('/api/integration', checkJwt, async (req, res) => {
 // --- Public Webhook ---
 // Verification Request from Meta
 app.get('/api/whatsapp/webhook', (req, res) => {
-  const verify_token = process.env.META_VERIFY_TOKEN || 'vamkor_crm_secure_token';
+  const verify_token = process.env.META_VERIFY_TOKEN;
   let mode = req.query["hub.mode"];
   let token = req.query["hub.verify_token"];
   let challenge = req.query["hub.challenge"];
