@@ -7,21 +7,25 @@ import {
 import Add from '@mui/icons-material/Add';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import AccessTime from '@mui/icons-material/AccessTime';
+import { useAuth } from '../AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 function Templates() {
+  const { token } = useAuth();
   const [templates, setTemplates] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newTemplate, setNewTemplate] = useState({ name: '', category: 'MARKETING', content: '' });
 
   useEffect(() => {
-    fetchTemplates();
-  }, []);
+    if (token) fetchTemplates();
+  }, [token]);
 
   const fetchTemplates = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/templates`);
+      const res = await axios.get(`${API_URL}/api/templates`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setTemplates(res.data);
     } catch (err) {
       console.error('Failed to fetch templates:', err);
@@ -31,7 +35,9 @@ function Templates() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/api/templates`, newTemplate);
+      await axios.post(`${API_URL}/api/templates`, newTemplate, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setIsCreating(false);
       setNewTemplate({ name: '', category: 'MARKETING', content: '' });
       fetchTemplates();

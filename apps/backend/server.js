@@ -201,6 +201,19 @@ app.post('/api/messages', checkJwt, async (req, res) => {
   const { customerId, message, direction, mediaUrl, mediaType } = req.body;
   
   if (direction === 'OUTBOUND') {
+    // Fetch customer details first to get the phone number
+    const { data: customer, error: custErr } = await supabase
+      .from('customers')
+      .select('phone')
+      .eq('id', customerId)
+      .eq('agency_id', req.user.agency_id)
+      .single();
+
+    if (custErr || !customer) {
+      console.error('[POST /api/messages] Failed to fetch customer:', custErr?.message);
+      return res.status(404).json({ error: 'Customer not found or access denied.' });
+    }
+
     // Fetch WhatsApp Credentials from Settings
     const { data: settings, error: setErr } = await supabase
       .from('settings')
@@ -347,6 +360,48 @@ app.delete('/api/campaigns/:id', checkJwt, async (req, res) => {
   res.json({ success: true });
 });
 
+// --- Templates ---
+app.get('/api/templates', checkJwt, async (req, res) => {
+  const { data, error } = await supabase
+    .from('templates')
+    .select('*')
+    .eq('agency_id', req.user.agency_id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[GET /api/templates] Supabase error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+  res.json(data || []);
+});
+
+app.post('/api/templates', checkJwt, async (req, res) => {
+  const { name, category, content } = req.body;
+  if (!name || !content) {
+    return res.status(400).json({ error: 'Name and content are required.' });
+  }
+  
+  const { data, error } = await supabase
+    .from('templates')
+    .insert([
+      {
+        agency_id: req.user.agency_id,
+        name: String(name).trim().substring(0, 255),
+        category: category || 'MARKETING',
+        content: String(content).trim(),
+        status: 'APPROVED' // Auto-approve for demo/simplicity
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[POST /api/templates] Error:', error.message);
+    return res.status(500).json({ error: 'Failed to create template.' });
+  }
+  res.json(data);
+});
+
 // --- Billing ---
 app.get('/api/billing', checkJwt, async (req, res) => {
   // Try to fetch subscription/wallet
@@ -430,7 +485,10 @@ app.post('/api/integration', checkJwt, async (req, res) => {
   ];
 
   const { error } = await supabase.from('settings').upsert(settings);
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[POST /api/integration] Supabase Upsert Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
   res.json({ success: true });
 });
 
@@ -623,6 +681,217 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
     return res.sendStatus(200);
   } else {
     return res.sendStatus(404);
+  }
+});
+
+// --- Team / Agents Management ---
+app.get('/api/auth/agents', checkJwt, async (req, res) => {
+  // Only Admins or Super Admins can list agents
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Access denied.' });
+  }
+
+  try {
+    // Fetch all profiles for this agency
+    const { data: profiles, error: profErr } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('agency_id', req.user.agency_id);
+
+    if (profErr) {
+      console.error('[GET /api/auth/agents] Profiles error:', profErr.message);
+      return res.status(500).json({ error: profErr.message });
+    }
+
+    // Fetch users from auth to match emails
+    const { data: { users }, error: authErr } = await supabase.auth.admin.listUsers();
+    if (authErr) {
+      console.error('[GET /api/auth/agents] Auth list error:', authErr.message);
+      // Fallback: return profiles without emails
+      return res.json(profiles.map(p => ({ ...p, email: 'unknown@vamkor.com' })));
+    }
+
+    const userMap = users.reduce((acc, u) => {
+      acc[u.id] = u.email;
+      return acc;
+    }, {});
+
+    const agents = profiles.map(p => ({
+      id: p.id,
+      username: p.username || 'No Name',
+      email: userMap[p.id] || 'unknown@vamkor.com',
+      role: p.role,
+      status: p.status,
+      contactNumber: p.contact_number,
+      assigned_campaigns: p.assigned_campaigns,
+      assigned_countries: p.assigned_countries,
+      created_at: p.created_at
+    }));
+
+    res.json(agents);
+  } catch (err) {
+    console.error('[GET /api/auth/agents] Unexpected error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/agents', checkJwt, async (req, res) => {
+  // Only Admins or Super Admins can create agents
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Access denied.' });
+  }
+
+  const { username, email, password, contactNumber, role, assigned_campaigns, assigned_countries, status } = req.body;
+  if (!email || !password || !username) {
+    return res.status(400).json({ error: 'Username, email, and password are required.' });
+  }
+
+  try {
+    // 1. Create auth user via admin API
+    const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+      email: email,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        username: username,
+        contact_number: contactNumber,
+        role: role || 'Sales Agent'
+      }
+    });
+
+    if (authErr) {
+      console.error('[POST /api/auth/agents] Auth creation error:', authErr.message);
+      return res.status(400).json({ error: authErr.message });
+    }
+
+    const newUser = authData.user;
+
+    // 2. Create profile row
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .insert([
+        {
+          id: newUser.id,
+          agency_id: req.user.agency_id,
+          role: role || 'Sales Agent',
+          username: username,
+          contact_number: contactNumber || null,
+          assigned_campaigns: assigned_campaigns || [],
+          assigned_countries: assigned_countries || [],
+          status: status || 'Active'
+        }
+      ])
+      .select()
+      .single();
+
+    if (profErr) {
+      console.error('[POST /api/auth/agents] Profile insert error:', profErr.message);
+      // Clean up the created auth user
+      await supabase.auth.admin.deleteUser(newUser.id);
+      return res.status(500).json({ error: 'Failed to create agent profile record.' });
+    }
+
+    res.json({
+      id: profile.id,
+      username: profile.username,
+      email: newUser.email,
+      role: profile.role,
+      status: profile.status,
+      contactNumber: profile.contact_number,
+      created_at: profile.created_at
+    });
+  } catch (err) {
+    console.error('[POST /api/auth/agents] Unexpected error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Two-Factor Authentication (2FA) ---
+app.post('/api/auth/2fa/setup', checkJwt, async (req, res) => {
+  try {
+    const speakeasy = require('speakeasy');
+    const QRCode = require('qrcode');
+
+    const secret = speakeasy.generateSecret({
+      name: `VAMKOR CRM (${req.user.email})`
+    });
+
+    // Save secret to user's metadata in Supabase Auth Admin
+    const { error: updateErr } = await supabase.auth.admin.updateUserById(req.user.id, {
+      user_metadata: {
+        two_factor_secret: secret.base32,
+        two_factor_enabled_pending: true
+      }
+    });
+
+    if (updateErr) {
+      console.error('[POST /api/auth/2fa/setup] Supabase Auth update error:', updateErr.message);
+      return res.status(500).json({ error: 'Failed to initiate 2FA setup.' });
+    }
+
+    const qrCodeDataUrl = await QRCode.toDataURL(secret.otpauth_url);
+
+    res.json({
+      secret: secret.base32,
+      qrCode: qrCodeDataUrl
+    });
+  } catch (err) {
+    console.error('[POST /api/auth/2fa/setup] Unexpected error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/2fa/verify', checkJwt, async (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: 'Verification code is required.' });
+  }
+
+  try {
+    const speakeasy = require('speakeasy');
+
+    // Fetch user details to get the secret from metadata
+    const { data: { user }, error: fetchErr } = await supabase.auth.admin.getUserById(req.user.id);
+    if (fetchErr || !user) {
+      console.error('[POST /api/auth/2fa/verify] User fetch error:', fetchErr?.message);
+      return res.status(500).json({ error: 'Failed to retrieve user authentication details.' });
+    }
+
+    const secret = user.user_metadata?.two_factor_secret;
+    if (!secret) {
+      return res.status(400).json({ error: '2FA has not been set up. Please initiate setup first.' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: secret,
+      encoding: 'base32',
+      token: token,
+      window: 1
+    });
+
+    if (!verified) {
+      return res.status(400).json({ error: 'Invalid verification code.' });
+    }
+
+    // Update profile table
+    await supabase
+      .from('profiles')
+      .update({ two_factor_enabled: true })
+      .eq('id', req.user.id);
+
+    // Update auth metadata
+    await supabase.auth.admin.updateUserById(req.user.id, {
+      user_metadata: {
+        two_factor_secret: secret,
+        two_factor_enabled: true,
+        two_factor_enabled_pending: false
+      }
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[POST /api/auth/2fa/verify] Unexpected error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

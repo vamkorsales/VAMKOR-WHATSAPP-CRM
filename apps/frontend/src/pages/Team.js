@@ -36,8 +36,8 @@ function Team() {
   const [permissions, setPermissions] = useState({});
 
   useEffect(() => {
-    fetchAgents();
-  }, []);
+    if (token) fetchAgents();
+  }, [token]);
 
   const fetchAgents = async () => {
     try {

@@ -15,9 +15,11 @@ import Overview from './pages/Overview';
 import Billing from './pages/Billing';
 import Team from './pages/Team';
 import SuperAdmin from './pages/SuperAdmin';
+import MetaSignupPopup from './pages/MetaSignupPopup';
 import { AuthGuard } from './AuthGuard';
 import { useAuth } from './AuthContext';
 import { Navigate } from 'react-router-dom';
+
 
 const AdminRoute = ({ children }) => {
   const { user } = useAuth();
@@ -41,6 +43,7 @@ function App() {
       <Route path="/" element={<Homepage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/meta-signup-popup" element={<MetaSignupPopup />} />
       <Route path="/dashboard" element={<AuthGuard component={DashboardLayout} />}>
         {/* Default route for /dashboard redirects or defaults to overview */}
         <Route index element={<Overview />} />

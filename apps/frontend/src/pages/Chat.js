@@ -13,7 +13,7 @@ import { useAuth } from '../AuthContext';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 function Chat() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -25,6 +25,66 @@ function Chat() {
   useEffect(() => {
     if (token) fetchCustomers();
   }, [token]);
+
+  // Real-time listener for incoming/outgoing messages
+  useEffect(() => {
+    if (!selectedCustomer || !user) return;
+
+    const messagesChannel = supabase
+      .channel(`chat_msg_${selectedCustomer.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `agency_id=eq.${user.agency_id}`
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          if (newMsg.customer_id === selectedCustomer.id) {
+            setMessages((prev) => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(messagesChannel);
+    };
+  }, [selectedCustomer, user]);
+
+  // Real-time listener for new customer conversations
+  useEffect(() => {
+    if (!user) return;
+
+    const customersChannel = supabase
+      .channel('chat_cust_list')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'customers',
+          filter: `agency_id=eq.${user.agency_id}`
+        },
+        (payload) => {
+          const newCustomer = payload.new;
+          setCustomers((prev) => {
+            if (prev.some(c => c.id === newCustomer.id)) return prev;
+            return [newCustomer, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(customersChannel);
+    };
+  }, [user]);
 
   useEffect(() => {
     scrollToBottom();

@@ -9,6 +9,8 @@ import QrCode2Icon from '@mui/icons-material/QrCode2';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
 function Integration() {
   const { token } = useAuth();
   const [tokenType, setTokenType] = useState('Permanent');
@@ -36,7 +38,7 @@ function Integration() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await axios.get('http://localhost:5001/api/integration', {
+        const res = await axios.get(`${API_URL}/api/integration`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setMetaConfig({
@@ -58,7 +60,7 @@ function Integration() {
   const handleSaveMetaConfig = async () => {
     setLoading(true);
     try {
-      await axios.post('http://localhost:5001/api/integration', {
+      await axios.post(`${API_URL}/api/integration`, {
         ...metaConfig,
         whatsappConnectionType: 'meta'
       }, {
@@ -77,20 +79,20 @@ function Integration() {
     setQrLoading(true);
     try {
       // Start session
-      await axios.post('http://localhost:5001/api/openwa/session/start', {}, {
+      await axios.post(`${API_URL}/api/openwa/session/start`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       // Wait a moment for engine to initialize
       setTimeout(async () => {
         try {
-          const res = await axios.get('http://localhost:5001/api/openwa/session/qr', {
+          const res = await axios.get(`${API_URL}/api/openwa/session/qr`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           setQrCodeData(res.data.qrCode);
           
           // Save connection type
-          await axios.post('http://localhost:5001/api/integration', {
+          await axios.post(`${API_URL}/api/integration`, {
             whatsappConnectionType: 'openwa'
           }, {
             headers: { Authorization: `Bearer ${token}` }
@@ -109,6 +111,52 @@ function Integration() {
       setQrLoading(false);
     }
   };
+
+  const handleFacebookConnect = () => {
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      '/meta-signup-popup',
+      'FacebookLoginPopup',
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=no`
+    );
+  };
+
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      if (event.data && event.data.type === 'META_SIGNUP_SUCCESS') {
+        const { phoneNumberId, whatsappBusinessAccountId, accessToken } = event.data.credentials;
+        setMetaConfig({
+          phoneNumberId,
+          whatsappBusinessAccountId,
+          accessToken
+        });
+        
+        setLoading(true);
+        try {
+          await axios.post(`${API_URL}/api/integration`, {
+            phoneNumberId,
+            whatsappBusinessAccountId,
+            accessToken,
+            whatsappConnectionType: 'meta'
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setSuccessMsg('Meta WhatsApp API connected and configured via Facebook successfully!');
+          setWaConnectionType('meta');
+        } catch (error) {
+          console.error('Failed to save settings from FB connect:', error);
+          alert('Failed to save settings');
+        }
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [token]);
 
   // Mock API Keys
   const [apiKeys] = useState([
@@ -226,7 +274,7 @@ function Integration() {
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant="h6" fontWeight="bold">WhatsApp Numbers</Typography>
-          <Button variant="contained" color="success" onClick={() => alert('Future feature: Embedded Signup Flow')}>Connect via Facebook</Button>
+          <Button variant="contained" color="success" onClick={handleFacebookConnect}>Connect via Facebook</Button>
         </Box>
         <TableContainer>
           <Table size="small">
